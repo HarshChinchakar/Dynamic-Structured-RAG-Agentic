@@ -345,7 +345,7 @@ with tab2:
                     result_text = policy_handler(q)
 
                 if isinstance(result_text, str) and result_text.startswith("ERROR"):
-                    st.error(result_text)
+                    st.error(result_text) 
                 else:
                     st.success("✅ Policy handler executed successfully.")
             except Exception as e:
