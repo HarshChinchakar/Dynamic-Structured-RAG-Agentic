@@ -96,7 +96,7 @@ except Exception:
 # PAGE CONFIG
 # ------------------------------------------------
 st.set_page_config(page_title="Policy + Mongo Agent", page_icon="🧠", layout="wide")
-st.title("🧠 AI Assistant — Policy RAG + Mongo Document Agent")
+st.title("AI HR Assistant — Policy RAG + Mongo Document Agent")
 
 
 # ------------------------------------------------
@@ -202,10 +202,10 @@ with tab1:
         candidates = ret.get("candidates", [])
         chunks = [c["text"] for c in candidates]
 
-        with st.expander("📄 Retrieved Chunks (Click to Expand)", expanded=False):
-        for i, c in enumerate(chunks):
-            st.markdown(f"### Chunk {i+1}")
-            st.code(c)
+        with st.expander("Retrieved Chunks (Click to Expand)", expanded=False):
+            for i, c in enumerate(chunks):
+                st.markdown(f"### Chunk {i+1}")
+                st.code(c)
 
 
         st.header("LLM ANSWER — DEBUG MODE")
