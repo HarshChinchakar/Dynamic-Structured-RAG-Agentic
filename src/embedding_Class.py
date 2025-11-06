@@ -74,15 +74,23 @@ except Exception:
 
 # PDFs
 # PDFs — with full debug logging
+# PDFs — with full debug logging
+def _local_log(msg: str):
+    """Local logger used ONLY for early import debugging (before _print exists)."""
+    try:
+        print(msg)
+    except Exception:
+        pass
+
 try:
     import pypdf
     from pypdf import PdfReader
-    _print(f"[DEBUG] ✅ pypdf imported successfully — version: {pypdf.__version__}")
+    _local_log(f"[DEBUG] ✅ pypdf imported successfully — version: {pypdf.__version__}")
 except Exception as e:
     PdfReader = None
-    # Print the actual error so we know WHY import failed
-    _print(f"[DEBUG] ❌ Failed to import pypdf / PdfReader")
-    _print(f"[DEBUG] Import error details: {e}")
+    _local_log("[DEBUG] ❌ Failed to import pypdf / PdfReader")
+    _local_log(f"[DEBUG] Import error details: {e}")
+
 
 
 # Excel/CSV
