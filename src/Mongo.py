@@ -141,12 +141,13 @@ class NaturalLanguageToMQL:
         # Unmask
         unmasked_output = self.pii_masker.unmask({"content": final_output})["content"]
     
-        # If Streamlit requests the raw value
+        # ✅ Streamlit / app.py consumption
         if return_output:
             return unmasked_output
     
-        # Otherwise print normally (CLI mode)
+        # ✅ CLI fallback
         print(unmasked_output)
+
 
 
 
