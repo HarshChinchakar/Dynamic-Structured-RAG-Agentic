@@ -208,23 +208,98 @@ def _read_json_text(path: Path) -> str:
     return "\n".join(t for t in texts if t and t.strip())
 
 def _read_pdf_text(path: Path) -> str:
-    if PdfReader is None:
-        _print("pypdf not installed; skipping PDF: " + str(path))
-        return ""
+    """
+    Ultra-robust PDF extraction using PyMuPDF (fitz),
+    with fallback to PyPDF2 and last-chance binary fallback.
+    Always returns *some* text. Logs every failure.
+    """
+    _print(f"[PDF] Attempting extraction (PyMuPDF first): {path}")
+
+    text_collected = []
+
+    # -------------------------------
+    # 1) Try PyMuPDF (fitz)
+    # -------------------------------
     try:
-        reader = PdfReader(str(path))
-        pages_text = []
+        import fitz  # pymupdf
+        _print("[PDF] ✅ Using PyMuPDF backend")
+
+        doc = fitz.open(str(path))
+        for i, page in enumerate(doc):
+            try:
+                t = page.get_text("text") or ""
+            except Exception as e:
+                _print(f"[PDF:PyMuPDF] Page {i+1} extract error: {e}")
+                t = ""
+
+            if t.strip():
+                text_collected.append(f"[[PAGE {i+1}]]\n{t}")
+
+        if text_collected:
+            return "\n\n".join(text_collected)
+
+        _print("[PDF:PyMuPDF] WARNING — No text extracted")
+
+    except Exception as e:
+        _print(f"[PDF] ❌ PyMuPDF failed: {e}")
+
+    # -------------------------------
+    # 2) Try PyPDF2 fallback
+    # -------------------------------
+    try:
+        import PyPDF2
+        _print("[PDF] ✅ Using PyPDF2 fallback backend")
+
+        reader = PyPDF2.PdfReader(str(path))
         for i, page in enumerate(reader.pages):
             try:
                 t = page.extract_text() or ""
-            except Exception:
+            except Exception as e:
+                _print(f"[PDF:PyPDF2] Page {i+1} error: {e}")
                 t = ""
-            if t:
-                pages_text.append(f"[[PAGE {i+1}]]\n{t}")
-        return "\n\n".join(pages_text)
+
+            if t.strip():
+                text_collected.append(f"[[PAGE {i+1}]]\n{t}")
+
+        if text_collected:
+            return "\n\n".join(text_collected)
+
+        _print("[PDF:PyPDF2] WARNING — No text extracted")
+
     except Exception as e:
-        _print(f"PDF read error for {path.name}: {e}")
-        return ""
+        _print(f"[PDF] ❌ PyPDF2 failed: {e}")
+
+    # -------------------------------
+    # 3) System pdftotext (if available)
+    # -------------------------------
+    try:
+        import subprocess
+        _print("[PDF] Trying system fallback: pdftotext (Poppler)")
+        out = subprocess.check_output(["pdftotext", str(path), "-"], stderr=subprocess.STDOUT)
+        t = out.decode("utf-8", errors="ignore")
+        if t.strip():
+            _print("[PDF] ✅ Extracted via system pdftotext")
+            return t
+    except Exception as e:
+        _print(f"[PDF] ❌ pdftotext failed: {e}")
+
+    # -------------------------------
+    # 4) Fallback — return partial binary hex dump
+    # -------------------------------
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+        _print("[PDF] ❗ Final fallback: returning hex dump")
+        return data.hex()[:5000]
+    except Exception:
+        pass
+
+    # -------------------------------
+    # 5) Absolute fallback
+    # -------------------------------
+    _print(f"[PDF] ❌ Complete extraction failure for: {path.name}")
+    return ""
+
 
 def _read_csv_text(path: Path) -> str:
     try:
