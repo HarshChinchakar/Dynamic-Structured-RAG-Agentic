@@ -1079,7 +1079,7 @@ with tab1:
 with tab2:
 
     st.header("🗄️ Mongo Document Query — HR BOT")
-    st.markdown("This runs `src/app.py` via **uv run**, passing email + query, and returns JSON output.")
+    st.markdown("This runs `src/app.py` via uv, passing email + query, and returns JSON output.")
 
     email = st.text_input("User Email")
     query = st.text_area("Document Query", height=150)
@@ -1090,13 +1090,11 @@ with tab2:
             st.warning("⚠️ Please enter BOTH email and query.")
             st.stop()
 
-        # -------------------------------------------
-        # ✅ Run "uv run src/app.py"
-        # -------------------------------------------
         import subprocess, json as _json, shlex
 
+        # ✅ FINAL FIX — no --active
         uv_cmd = [
-            "uv", "run", "--active",  # ✅ <-- ONLY here, NOT passed to app.py
+            "uv", "run",
             "src/app.py",
             "--email", email,
             "--query", query
@@ -1105,7 +1103,7 @@ with tab2:
         st.write("### 🔧 Running command:")
         st.code(" ".join(shlex.quote(p) for p in uv_cmd))
 
-        # Live output
+        # LIVE LOG STREAM
         log_box = st.empty()
         logs = []
 
@@ -1122,29 +1120,21 @@ with tab2:
             st.error("❌ `uv` command not found. Install uv.")
             st.stop()
 
-        # -------------------------------------------
-        # ✅ Stream logs live
-        # -------------------------------------------
         for line in proc.stdout:
-            logs.append(line.rstrip("\n"))
+            logs.append(line.rstrip())
             log_box.code("\n".join(logs[-200:]))
 
         proc.wait()
 
-        # -------------------------------------------
-        # ✅ Show full logs
-        # -------------------------------------------
+        # FULL LOG
         st.subheader("📄 Full Terminal Log")
         st.code("\n".join(logs))
 
-        # -------------------------------------------
-        # ✅ Extract final JSON printed by app.py
-        # -------------------------------------------
+        # ✅ EXTRACT FINAL JSON
         st.subheader("✅ Final Output")
         try:
             final_json = _json.loads(logs[-1])
             st.json(final_json)
         except Exception:
-            st.error("❌ Could not parse JSON from final line.")
+            st.error("❌ Could not parse final line as JSON.")
             st.code(logs[-1])
-            st.stop()
