@@ -1,7 +1,7 @@
 from src.Mongo import NaturalLanguageToMQL
 
 from langchain_core.messages import HumanMessage
-from langgraph_sample import access_agent
+from src.langgraph_sample import access_agent
 
 def run_document_query(email: str, query: str):
     """
