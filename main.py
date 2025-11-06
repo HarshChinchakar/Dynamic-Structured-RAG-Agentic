@@ -541,6 +541,265 @@
 # Policy-only mode, prints EVERYTHING for debugging
 # ================================================
 
+# import streamlit as st
+# from datetime import datetime, timezone
+# import traceback
+# import os
+# import sys
+# import importlib
+# import importlib.util
+
+# # ------------------------------------------------
+# # PATH SETUP
+# # ------------------------------------------------
+# ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+# SRC_DIR = os.path.join(ROOT_DIR, "src")
+
+# st.write("✅ ROOT_DIR:", ROOT_DIR)
+# st.write("✅ SRC_DIR:", SRC_DIR)
+
+
+# # ------------------------------------------------
+# # MODULE LOADER (prints EVERYTHING)
+# # ------------------------------------------------
+# def load_src_module(module_name: str):
+#     st.write(f"🔍 Attempting to import module: {module_name}")
+
+#     full_name = f"src.{module_name}"
+
+#     # 1) normal import attempt
+#     try:
+#         mod = importlib.import_module(full_name)
+#         st.success(f"✅ Imported via package: {full_name}")
+#         return mod
+#     except Exception as e:
+#         st.warning(f"⚠️ Normal import failed for {full_name}: {e}")
+
+#     # 2) fallback file import
+#     module_path = os.path.join(SRC_DIR, f"{module_name}.py")
+#     st.write("🔍 Fallback loading from file:", module_path)
+
+#     if not os.path.isfile(module_path):
+#         raise ImportError(f"❌ Module file not found: {module_path}")
+
+#     spec = importlib.util.spec_from_file_location(full_name, module_path)
+#     if spec is None or spec.loader is None:
+#         raise ImportError("❌ Could not load import spec")
+
+#     mod = importlib.util.module_from_spec(spec)
+#     sys.modules[full_name] = mod
+#     sys.modules[module_name] = mod  # convenience
+
+#     try:
+#         spec.loader.exec_module(mod)
+#         st.success(f"✅ Loaded successfully from file: {module_path}")
+#         return mod
+#     except Exception as e:
+#         st.error(f"❌ Exec failed for {module_path}: {e}")
+#         raise
+
+
+# # ------------------------------------------------
+# # IMPORT MODULES WITH DEBUG LOGGING
+# # ------------------------------------------------
+
+# # 1) Router (we ignore its output; we hardcode POLICIES)
+# try:
+#     Router_mod = load_src_module("Router_gpt")
+#     classify_query = getattr(Router_mod, "classify_query")
+# except Exception as e:
+#     st.error(f"Router import error: {e}")
+#     classify_query = None
+
+# # 2) Embedding class
+# try:
+#     Emb_mod = load_src_module("embedding_Class")
+#     RAGIndexer = getattr(Emb_mod, "RAGIndexer")
+#     st.success("✅ RAGIndexer loaded.")
+# except Exception as e:
+#     st.error(f"Failed loading embedding_Class: {e}")
+#     st.stop()
+
+# # 3) Retriever
+# try:
+#     Ret_mod = load_src_module("retrival_class")
+#     Retriever = getattr(Ret_mod, "Retriever")
+#     policy_handler_from_retriever = getattr(Ret_mod, "policy_handler_from_retriever", None)
+#     st.success("✅ Retriever loaded.")
+# except Exception as e:
+#     st.error(f"Failed loading retrival_class: {e}")
+#     st.stop()
+
+# # 4) ✅ **Correct multimedia filename**
+# try:
+#     Multi_mod = load_src_module("Mutlimedia")     # ✅ FIXED — exactly as you said
+#     multimedia_response = getattr(Multi_mod, "multimedia_response", None)
+#     st.success("✅ Mutlimedia loaded.")
+# except Exception as e:
+#     st.warning(f"⚠️ Mutlimedia not loaded: {e}")
+#     multimedia_response = None
+
+
+# # ------------------------------------------------
+# # STREAMLIT PAGE CONFIG
+# # ------------------------------------------------
+# st.set_page_config(page_title="Policy RAG — DEBUG", page_icon="🪵", layout="wide")
+# st.title("🪵 FULL DEBUG — Policy RAG (Policy Only Mode)")
+
+
+# # ------------------------------------------------
+# # STATE INIT
+# # ------------------------------------------------
+# if "rag_cache" not in st.session_state:
+#     st.session_state.rag_cache = None
+
+# if "query_to_run" not in st.session_state:
+#     st.session_state.query_to_run = None
+
+
+# # ------------------------------------------------
+# # UI INPUTS
+# # ------------------------------------------------
+# user_query = st.text_area("Enter your question", height=150)
+# run = st.button("Run Query (Policy Only)")
+
+# rebuild = st.button("Rebuild Embeddings (force)")
+# if rebuild:
+#     st.session_state.rag_cache = None
+#     st.info("✅ Cache cleared, embeddings will rebuild on next Run.")
+
+
+# # ------------------------------------------------
+# # EMBEDDING LOGIC (DEBUG MODE)
+# # ------------------------------------------------
+# POLICIES_PATH = os.path.join(ROOT_DIR, "Dataset", "Policies")
+# st.write("📁 Policy Directory:", POLICIES_PATH)
+
+
+# def build_index_debug():
+#     st.write("🔥 Building index with FULL DEBUG...")
+
+#     try:
+#         idx = RAGIndexer(
+#             local_paths=[POLICIES_PATH],
+#             s3_urls=None,
+#             workdir="rag_work",
+#             embed_model="text-embedding-3-large",
+#             max_tokens=900,
+#             overlap=150,
+#             min_chunk_chars=280,
+#         )
+
+#         st.write("📌 Calling idx.build() ... watch logs below 👇")
+#         idx.build()
+
+#         # ✅ Print extracted texts count
+#         st.write("✅ Texts extracted:", len(idx.texts))
+#         st.write("✅ Embeddings shape:", idx.vectors.shape if idx.vectors is not None else "None")
+#         st.write("✅ Sample metadata:", idx.metadatas[:3])
+
+#         st.session_state.rag_cache = {
+#             "texts": idx.texts,
+#             "vectors": idx.vectors,
+#             "metadatas": idx.metadatas,
+#             "embed_model": idx.cfg.embed_model,
+#         }
+
+#         st.success("✅ Embedding SUCCESS — stored to RAM")
+
+#     except Exception as e:
+#         st.error("❌ Embedding failed:")
+#         st.code(traceback.format_exc())
+
+
+# if st.session_state.rag_cache is None:
+#     build_index_debug()
+
+
+# # ------------------------------------------------
+# # QUERY EXECUTION — POLICY ONLY
+# # ------------------------------------------------
+# if run:
+#     if not user_query.strip():
+#         st.warning("Enter a valid query.")
+#         st.stop()
+
+#     st.session_state.query_to_run = user_query.strip()
+
+
+# if st.session_state.query_to_run:
+#     q = st.session_state.query_to_run
+
+#     st.markdown("---")
+#     st.header("🔎 DEBUG EXECUTION — POLICY ONLY")
+
+#     # ------------------------------------------------
+#     # 1) Retrieve chunks
+#     # ------------------------------------------------
+#     cache = st.session_state.rag_cache
+
+#     st.write("🧠 Creating retriever with cached embeddings...")
+#     try:
+#         retr = Retriever(
+#             texts=cache["texts"],
+#             vectors=cache["vectors"],
+#             metadatas=cache["metadatas"],
+#             embed_model=cache["embed_model"],
+#         )
+#     except Exception as e:
+#         st.error("Retriever creation failed:")
+#         st.code(traceback.format_exc())
+#         st.stop()
+
+#     st.write("📌 Running retriever.retrieve() ...")
+#     try:
+#         ret = retr.retrieve(q, top_k=10, rerank=True)
+#     except Exception as e:
+#         st.error("Retriever failed:")
+#         st.code(traceback.format_exc())
+#         st.stop()
+
+#     st.write("✅ Retriever output (RAW):")
+#     st.json(ret)
+
+#     if "error" in ret:
+#         st.error("Retriever returned error:", ret["error"])
+#         st.stop()
+
+#     candidates = ret.get("candidates", [])
+#     chunks = [c["text"] for c in candidates]
+
+#     st.subheader("📄 Retrieved Chunks (Top 10)")
+#     for i, c in enumerate(chunks):
+#         st.code(f"[Chunk {i+1}] {c[:800]}")
+
+
+#     # ------------------------------------------------
+#     # 2) FINAL ANSWER (MULTIMEDIA RESPONSE OR CONCAT)
+#     # ------------------------------------------------
+#     st.header("🧠 LLM ANSWER — DEBUG MODE")
+
+#     try:
+#         if multimedia_response:
+#             st.write("📌 Using Mutlimedia.multimedia_response()")
+#             final_ans = multimedia_response(q, chunks)
+#         else:
+#             st.write("⚠️ Mutlimedia not available, falling back to concatenation.")
+#             final_ans = "\n\n-----------\n\n".join(chunks)
+#     except Exception as e:
+#         st.error("LLM Answer generation failed:")
+#         st.code(traceback.format_exc())
+#         final_ans = f"[ERROR] {e}"
+
+#     st.subheader("✅ FINAL ANSWER")
+#     st.write(final_ans)
+
+#     # reset
+#     st.session_state.query_to_run = None
+
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ DIFFERENT TABS
+
 import streamlit as st
 from datetime import datetime, timezone
 import traceback
@@ -560,14 +819,14 @@ st.write("✅ SRC_DIR:", SRC_DIR)
 
 
 # ------------------------------------------------
-# MODULE LOADER (prints EVERYTHING)
+# MODULE LOADER
 # ------------------------------------------------
 def load_src_module(module_name: str):
     st.write(f"🔍 Attempting to import module: {module_name}")
 
     full_name = f"src.{module_name}"
 
-    # 1) normal import attempt
+    # 1) import as package module
     try:
         mod = importlib.import_module(full_name)
         st.success(f"✅ Imported via package: {full_name}")
@@ -575,7 +834,7 @@ def load_src_module(module_name: str):
     except Exception as e:
         st.warning(f"⚠️ Normal import failed for {full_name}: {e}")
 
-    # 2) fallback file import
+    # 2) fallback to direct path load
     module_path = os.path.join(SRC_DIR, f"{module_name}.py")
     st.write("🔍 Fallback loading from file:", module_path)
 
@@ -588,7 +847,7 @@ def load_src_module(module_name: str):
 
     mod = importlib.util.module_from_spec(spec)
     sys.modules[full_name] = mod
-    sys.modules[module_name] = mod  # convenience
+    sys.modules[module_name] = mod
 
     try:
         spec.loader.exec_module(mod)
@@ -600,10 +859,8 @@ def load_src_module(module_name: str):
 
 
 # ------------------------------------------------
-# IMPORT MODULES WITH DEBUG LOGGING
+# IMPORTS FOR TAB 1 (Policy RAG)
 # ------------------------------------------------
-
-# 1) Router (we ignore its output; we hardcode POLICIES)
 try:
     Router_mod = load_src_module("Router_gpt")
     classify_query = getattr(Router_mod, "classify_query")
@@ -611,7 +868,6 @@ except Exception as e:
     st.error(f"Router import error: {e}")
     classify_query = None
 
-# 2) Embedding class
 try:
     Emb_mod = load_src_module("embedding_Class")
     RAGIndexer = getattr(Emb_mod, "RAGIndexer")
@@ -620,7 +876,6 @@ except Exception as e:
     st.error(f"Failed loading embedding_Class: {e}")
     st.stop()
 
-# 3) Retriever
 try:
     Ret_mod = load_src_module("retrival_class")
     Retriever = getattr(Ret_mod, "Retriever")
@@ -630,9 +885,8 @@ except Exception as e:
     st.error(f"Failed loading retrival_class: {e}")
     st.stop()
 
-# 4) ✅ **Correct multimedia filename**
 try:
-    Multi_mod = load_src_module("Mutlimedia")     # ✅ FIXED — exactly as you said
+    Multi_mod = load_src_module("Mutlimedia")
     multimedia_response = getattr(Multi_mod, "multimedia_response", None)
     st.success("✅ Mutlimedia loaded.")
 except Exception as e:
@@ -641,159 +895,190 @@ except Exception as e:
 
 
 # ------------------------------------------------
-# STREAMLIT PAGE CONFIG
+# IMPORTS FOR TAB 2 (Mongo Document Agent)
 # ------------------------------------------------
-st.set_page_config(page_title="Policy RAG — DEBUG", page_icon="🪵", layout="wide")
-st.title("🪵 FULL DEBUG — Policy RAG (Policy Only Mode)")
-
-
-# ------------------------------------------------
-# STATE INIT
-# ------------------------------------------------
-if "rag_cache" not in st.session_state:
-    st.session_state.rag_cache = None
-
-if "query_to_run" not in st.session_state:
-    st.session_state.query_to_run = None
+try:
+    App_mod = load_src_module("app")   # ✅ loads src/app.py
+    run_document_query = getattr(App_mod, "run_document_query")
+    st.success("✅ Document Agent loaded (run_document_query).")
+except Exception as e:
+    st.error(f"❌ Failed loading app.py: {e}")
+    run_document_query = None
 
 
 # ------------------------------------------------
-# UI INPUTS
+# PAGE CONFIG
 # ------------------------------------------------
-user_query = st.text_area("Enter your question", height=150)
-run = st.button("Run Query (Policy Only)")
-
-rebuild = st.button("Rebuild Embeddings (force)")
-if rebuild:
-    st.session_state.rag_cache = None
-    st.info("✅ Cache cleared, embeddings will rebuild on next Run.")
+st.set_page_config(page_title="Policy + Mongo Document Agent", page_icon="🧠", layout="wide")
+st.title("🧠 AI Assistant — Policy RAG + Mongo Document Agent")
 
 
 # ------------------------------------------------
-# EMBEDDING LOGIC (DEBUG MODE)
+# CREATE TABS
 # ------------------------------------------------
-POLICIES_PATH = os.path.join(ROOT_DIR, "Dataset", "Policies")
-st.write("📁 Policy Directory:", POLICIES_PATH)
-
-
-def build_index_debug():
-    st.write("🔥 Building index with FULL DEBUG...")
-
-    try:
-        idx = RAGIndexer(
-            local_paths=[POLICIES_PATH],
-            s3_urls=None,
-            workdir="rag_work",
-            embed_model="text-embedding-3-large",
-            max_tokens=900,
-            overlap=150,
-            min_chunk_chars=280,
-        )
-
-        st.write("📌 Calling idx.build() ... watch logs below 👇")
-        idx.build()
-
-        # ✅ Print extracted texts count
-        st.write("✅ Texts extracted:", len(idx.texts))
-        st.write("✅ Embeddings shape:", idx.vectors.shape if idx.vectors is not None else "None")
-        st.write("✅ Sample metadata:", idx.metadatas[:3])
-
-        st.session_state.rag_cache = {
-            "texts": idx.texts,
-            "vectors": idx.vectors,
-            "metadatas": idx.metadatas,
-            "embed_model": idx.cfg.embed_model,
-        }
-
-        st.success("✅ Embedding SUCCESS — stored to RAM")
-
-    except Exception as e:
-        st.error("❌ Embedding failed:")
-        st.code(traceback.format_exc())
-
-
-if st.session_state.rag_cache is None:
-    build_index_debug()
+tab1, tab2 = st.tabs(["📘 Policy RAG (Existing Debug Mode)", "🗄️ Document Query — Mongo Agent"])
 
 
 # ------------------------------------------------
-# QUERY EXECUTION — POLICY ONLY
+# ✅ TAB 1 — EXACTLY YOUR ORIGINAL SCRIPT (UNCHANGED)
 # ------------------------------------------------
-if run:
-    if not user_query.strip():
-        st.warning("Enter a valid query.")
-        st.stop()
+with tab1:
 
-    st.session_state.query_to_run = user_query.strip()
+    st.header("📘 Policy RAG — DEBUG MODE (Unchanged)")
+
+    # STATE INIT
+    if "rag_cache" not in st.session_state:
+        st.session_state.rag_cache = None
+
+    if "query_to_run" not in st.session_state:
+        st.session_state.query_to_run = None
+
+    # INPUTS
+    user_query = st.text_area("Enter your question", height=150)
+    run = st.button("Run Query (Policy Only)")
+
+    rebuild = st.button("Rebuild Embeddings (force)")
+    if rebuild:
+        st.session_state.rag_cache = None
+        st.info("✅ Cache cleared, embeddings will rebuild on next Run.")
+
+    POLICIES_PATH = os.path.join(ROOT_DIR, "Dataset", "Policies")
+    st.write("📁 Policy Directory:", POLICIES_PATH)
+
+    # FUNCTION
+    def build_index_debug():
+        st.write("🔥 Building index with FULL DEBUG...")
+
+        try:
+            idx = RAGIndexer(
+                local_paths=[POLICIES_PATH],
+                s3_urls=None,
+                workdir="rag_work",
+                embed_model="text-embedding-3-large",
+                max_tokens=900,
+                overlap=150,
+                min_chunk_chars=280,
+            )
+
+            st.write("📌 Calling idx.build() ...")
+            idx.build()
+
+            st.write("✅ Texts extracted:", len(idx.texts))
+            st.write("✅ Embeddings shape:", idx.vectors.shape if idx.vectors is not None else "None")
+            st.write("✅ Sample metadata:", idx.metadatas[:3])
+
+            st.session_state.rag_cache = {
+                "texts": idx.texts,
+                "vectors": idx.vectors,
+                "metadatas": idx.metadatas,
+                "embed_model": idx.cfg.embed_model,
+            }
+
+            st.success("✅ Embedding SUCCESS — stored to RAM")
+
+        except Exception as e:
+            st.error("❌ Embedding failed:")
+            st.code(traceback.format_exc())
+
+    if st.session_state.rag_cache is None:
+        build_index_debug()
+
+    if run:
+        if not user_query.strip():
+            st.warning("Enter a valid query.")
+            st.stop()
+
+        st.session_state.query_to_run = user_query.strip()
+
+    if st.session_state.query_to_run:
+        q = st.session_state.query_to_run
+
+        st.markdown("---")
+        st.header("🔎 DEBUG EXECUTION — POLICY ONLY")
+
+        cache = st.session_state.rag_cache
+
+        st.write("🧠 Creating retriever with cached embeddings...")
+        try:
+            retr = Retriever(
+                texts=cache["texts"],
+                vectors=cache["vectors"],
+                metadatas=cache["metadatas"],
+                embed_model=cache["embed_model"],
+            )
+        except Exception as e:
+            st.error("Retriever creation failed:")
+            st.code(traceback.format_exc())
+            st.stop()
+
+        st.write("📌 Running retriever.retrieve() ...")
+        try:
+            ret = retr.retrieve(q, top_k=10, rerank=True)
+        except Exception as e:
+            st.error("Retriever failed:")
+            st.code(traceback.format_exc())
+            st.stop()
+
+        st.write("✅ Retriever output (RAW):")
+        st.json(ret)
+
+        if "error" in ret:
+            st.error("Retriever returned error:", ret["error"])
+            st.stop()
+
+        candidates = ret.get("candidates", [])
+        chunks = [c["text"] for c in candidates]
+
+        st.subheader("📄 Retrieved Chunks (Top 10)")
+        for i, c in enumerate(chunks):
+            st.code(f"[Chunk {i+1}] {c[:800]}")
+
+        st.header("🧠 LLM ANSWER — DEBUG MODE")
+
+        try:
+            if multimedia_response:
+                st.write("📌 Using Mutlimedia.multimedia_response()")
+                final_ans = multimedia_response(q, chunks)
+            else:
+                st.write("⚠️ Mutlimedia not available, fallback.")
+                final_ans = "\n\n-----------\n\n".join(chunks)
+        except Exception as e:
+            st.error("LLM Answer generation failed:")
+            st.code(traceback.format_exc())
+            final_ans = f"[ERROR] {e}"
+
+        st.subheader("✅ FINAL ANSWER")
+        st.write(final_ans)
+
+        st.session_state.query_to_run = None
 
 
-if st.session_state.query_to_run:
-    q = st.session_state.query_to_run
+# ------------------------------------------------
+# ✅ TAB 2 — MONGO DOCUMENT AGENT
+# ------------------------------------------------
+with tab2:
 
-    st.markdown("---")
-    st.header("🔎 DEBUG EXECUTION — POLICY ONLY")
+    st.header("🗄️ Mongo Document Query — HR BOT")
 
-    # ------------------------------------------------
-    # 1) Retrieve chunks
-    # ------------------------------------------------
-    cache = st.session_state.rag_cache
+    st.markdown("Enter **email** + **natural language query** to run the full Document pipeline.")
 
-    st.write("🧠 Creating retriever with cached embeddings...")
-    try:
-        retr = Retriever(
-            texts=cache["texts"],
-            vectors=cache["vectors"],
-            metadatas=cache["metadatas"],
-            embed_model=cache["embed_model"],
-        )
-    except Exception as e:
-        st.error("Retriever creation failed:")
-        st.code(traceback.format_exc())
-        st.stop()
+    email = st.text_input("User Email")
+    query = st.text_area("Document Query", height=150)
 
-    st.write("📌 Running retriever.retrieve() ...")
-    try:
-        ret = retr.retrieve(q, top_k=10, rerank=True)
-    except Exception as e:
-        st.error("Retriever failed:")
-        st.code(traceback.format_exc())
-        st.stop()
+    if st.button("Run Document Query"):
+        if not email.strip() or not query.strip():
+            st.warning("Please enter both Email and Query.")
+            st.stop()
 
-    st.write("✅ Retriever output (RAW):")
-    st.json(ret)
+        if run_document_query is None:
+            st.error("❌ Document Agent not loaded.")
+            st.stop()
 
-    if "error" in ret:
-        st.error("Retriever returned error:", ret["error"])
-        st.stop()
-
-    candidates = ret.get("candidates", [])
-    chunks = [c["text"] for c in candidates]
-
-    st.subheader("📄 Retrieved Chunks (Top 10)")
-    for i, c in enumerate(chunks):
-        st.code(f"[Chunk {i+1}] {c[:800]}")
-
-
-    # ------------------------------------------------
-    # 2) FINAL ANSWER (MULTIMEDIA RESPONSE OR CONCAT)
-    # ------------------------------------------------
-    st.header("🧠 LLM ANSWER — DEBUG MODE")
-
-    try:
-        if multimedia_response:
-            st.write("📌 Using Mutlimedia.multimedia_response()")
-            final_ans = multimedia_response(q, chunks)
-        else:
-            st.write("⚠️ Mutlimedia not available, falling back to concatenation.")
-            final_ans = "\n\n-----------\n\n".join(chunks)
-    except Exception as e:
-        st.error("LLM Answer generation failed:")
-        st.code(traceback.format_exc())
-        final_ans = f"[ERROR] {e}"
-
-    st.subheader("✅ FINAL ANSWER")
-    st.write(final_ans)
-
-    # reset
-    st.session_state.query_to_run = None
-
+        with st.spinner("Running Mongo Document Agent..."):
+            try:
+                output = run_document_query(email, query)
+                st.success("✅ Completed.")
+                st.json(output)
+            except Exception as e:
+                st.error("❌ Error during execution:")
+                st.code(traceback.format_exc())
