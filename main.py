@@ -1077,3 +1077,80 @@ with tab1:
 # ✅ TAB 2 — Mongo Document Agent (with ultra-logs)
 # ------------------------------------------------
 with tab2:
+
+    st.header("🗄️ Mongo Document Query — HR BOT")
+    st.markdown("Enter **email** + **document query** to run the HR Mongo Agent.")
+
+    email = st.text_input("User Email")
+    query = st.text_area("Document Query", height=150)
+
+    if st.button("Run Document Query"):
+
+        if not email.strip() or not query.strip():
+            st.warning("⚠️ Please enter BOTH Email and Query.")
+            st.stop()
+
+        st.markdown("### 🔍 Running `app.py`…")
+
+        # ---------------------------------------------------------
+        # ✅ 1. LOAD THE MODULE ALWAYS
+        # ---------------------------------------------------------
+        try:
+            App_mod = load_src_module("app")   # loads src/app.py
+            st.success("✅ app.py loaded successfully")
+        except Exception:
+            st.error("❌ app.py failed to load:")
+            st.code(traceback.format_exc())
+            st.stop()
+
+        # ---------------------------------------------------------
+        # ✅ 2. Inject parameters into the script
+        # ---------------------------------------------------------
+        try:
+            App_mod.email = email
+            App_mod.NATURAL_LANGUAGE_QUERY = query
+            st.write("✅ Injected parameters into app.py:")
+            st.json({
+                "email": email,
+                "query": query
+            })
+        except Exception:
+            st.error("❌ Failed injecting parameters into app.py:")
+            st.code(traceback.format_exc())
+            st.stop()
+
+        # ---------------------------------------------------------
+        # ✅ 3. CAPTURE app.py OUTPUT
+        # ---------------------------------------------------------
+        import io
+        import contextlib
+
+        buffer = io.StringIO()
+
+        st.markdown("### 📄 Raw Execution Log (from app.py)")
+        try:
+            with contextlib.redirect_stdout(buffer):
+                # ✅ If app.py has a main(), use it. Else re-run top-level code.
+                if hasattr(App_mod, "main"):
+                    App_mod.main()
+                else:
+                    # Re-run the module code safely
+                    spec = importlib.util.spec_from_file_location("src.app", os.path.join(SRC_DIR, "app.py"))
+                    mod = importlib.util.module_from_spec(spec)
+
+                    # Inject params before execution
+                    mod.email = email
+                    mod.NATURAL_LANGUAGE_QUERY = query
+
+                    spec.loader.exec_module(mod)
+
+            full_output = buffer.getvalue()
+            st.code(full_output)
+
+            st.success("✅ app.py executed successfully")
+
+        except Exception as e:
+            st.error("❌ app.py crashed:")
+            st.code(traceback.format_exc())
+            st.stop()
+
