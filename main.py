@@ -814,22 +814,24 @@ import importlib.util
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 SRC_DIR = os.path.join(ROOT_DIR, "src")
 
-st.write("✅ ROOT_DIR:", ROOT_DIR)
-st.write("✅ SRC_DIR:", SRC_DIR)
+
+#Testing Scripts
+# st.write("ROOT_DIR:", ROOT_DIR)
+# st.write("SRC_DIR:", SRC_DIR)
 
 
 # ------------------------------------------------
 # SUPER-LOGGING MODULE LOADER
 # ------------------------------------------------
 def load_src_module(module_name: str):
-    st.markdown(f"### 🔍 Loading Module: `{module_name}`")
+    # st.markdown(f"### 🔍 Loading Module: `{module_name}`")
 
     full_name = f"src.{module_name}"
 
     # 1. Normal package import attempt
     try:
         mod = importlib.import_module(full_name)
-        st.success(f"✅ Imported via package: `{full_name}`")
+        # st.success(f"Imported via package: `{full_name}`")
         return mod
     except Exception as e:
         st.warning(f"⚠️ Normal import failed for `{full_name}`")
@@ -837,10 +839,10 @@ def load_src_module(module_name: str):
 
     # 2. Fallback to raw file load
     module_path = os.path.join(SRC_DIR, f"{module_name}.py")
-    st.write(f"📄 Fallback loading from file:\n`{module_path}`")
+    st.write(f" Fallback loading from file:\n`{module_path}`")
 
     if not os.path.isfile(module_path):
-        raise ImportError(f"❌ Module file NOT found: {module_path}")
+        raise ImportError(f" Module file NOT found: {module_path}")
 
     spec = importlib.util.spec_from_file_location(full_name, module_path)
     mod = importlib.util.module_from_spec(spec)
@@ -850,15 +852,15 @@ def load_src_module(module_name: str):
 
     try:
         spec.loader.exec_module(mod)
-        st.success(f"✅ Loaded successfully from file: `{module_path}`")
+        # st.success(f" Loaded successfully from file: `{module_path}`")
 
         # ✅ EXTRA DEBUG: List module attributes
-        st.write("📌 **Module Attributes:**")
+        st.write(" **Module Attributes:**")
         st.json(sorted([x for x in dir(mod) if not x.startswith('_')]))
 
         return mod
     except Exception as e:
-        st.error(f"❌ Exec failed for `{module_path}`")
+        # st.error(f"❌ Exec failed for `{module_path}`")
         st.code(traceback.format_exc())
         raise
 
