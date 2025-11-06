@@ -569,8 +569,80 @@ with tab1:
         st.session_state.query_to_run = None
 
 
+# # ------------------------------------------------
+# # ✅ TAB 2 — Mongo Agent (Clean Mode)
+# # ------------------------------------------------
+# with tab2:
+
+#     st.header("🗄️ Mongo HR Agent — Clean Mode")
+
+#     email = st.text_input("User Email")
+#     query = st.text_area("Document Query", height=150)
+
+#     if st.button("Run Document Query"):
+
+#         if not email.strip() or not query.strip():
+#             st.warning("Please enter BOTH Email and Query.")
+#             st.stop()
+
+#         import subprocess, shlex
+
+#         uv_cmd = [
+#             "uv", "run",
+#             "src/app.py",
+#             "--email", email,
+#             "--query", query
+#         ]
+
+#         logs = []
+
+#         try:
+#             proc = subprocess.Popen(
+#                 uv_cmd,
+#                 stdout=subprocess.PIPE,
+#                 stderr=subprocess.STDOUT,
+#                 text=True,
+#                 cwd=ROOT_DIR,
+#                 bufsize=1
+#             )
+#         except Exception as e:
+#             st.error("Failed to run uv.")
+#             st.code(str(e))
+#             st.stop()
+
+#         for line in proc.stdout:
+#             logs.append(line.rstrip("\n"))
+
+#         proc.wait()
+
+#         st.subheader("Execution Log")
+#         st.code("\n".join(logs))
+
+#         # Extract final multiline answer
+#         final_lines = []
+#         pipeline_found = False
+
+#         for line in logs:
+#             if line.strip().startswith("Aggregation Pipeline:"):
+#                 pipeline_found = True
+#                 continue
+#             if pipeline_found:
+#                 final_lines.append(line)
+
+#         import re
+
+#         text = "\n".join(final_lines).strip()
+#         text = re.sub(r'\s*-\s*(\*\*[^*]+:\*\*)', r'\n- \1', text)
+#         text = re.sub(r'(:)\s*\n- ', r'\1\n\n- ', text)
+#         text = re.sub(r'\n{3,}', '\n\n', text).strip()
+
+#         final_answer_md = text
+
+#         st.subheader("Final Answer")
+#         st.markdown(final_answer_md)
+
 # ------------------------------------------------
-# ✅ TAB 2 — Mongo Agent (Clean Mode)
+# ✅ TAB 2 — Mongo Agent (robust final-answer extraction)
 # ------------------------------------------------
 with tab2:
 
@@ -585,7 +657,7 @@ with tab2:
             st.warning("Please enter BOTH Email and Query.")
             st.stop()
 
-        import subprocess, shlex
+        import subprocess, shlex, re
 
         uv_cmd = [
             "uv", "run",
@@ -610,33 +682,88 @@ with tab2:
             st.code(str(e))
             st.stop()
 
+        # collect logs (no double printing)
         for line in proc.stdout:
             logs.append(line.rstrip("\n"))
 
         proc.wait()
 
+        # Show full execution log once
         st.subheader("Execution Log")
         st.code("\n".join(logs))
 
-        # Extract final multiline answer
+        # -----------------------
+        # Robust final-answer extraction
+        # -----------------------
         final_lines = []
-        pipeline_found = False
+        last_structured_idx = -1
 
-        for line in logs:
-            if line.strip().startswith("Aggregation Pipeline:"):
-                pipeline_found = True
+        # markers that indicate structured output or intermediate debug
+        structured_patterns = [
+            r'^Aggregation Pipeline:',   # aggregation marker
+            r'^\{',                     # JSON / dict start
+            r'^\[',                     # list start
+            r'HumanMessage\(',          # langchain message
+            r'AIMessage\(',             # langchain message
+            r'^Fetched role',           # role log
+            r'^Allowed$',               # agent decision line alone
+            r'^Denied$',                # agent denied
+        ]
+        combined_re = re.compile("|".join(structured_patterns))
+
+        # find last structured marker index
+        for idx, line in enumerate(logs):
+            if line is None:
                 continue
-            if pipeline_found:
-                final_lines.append(line)
+            if combined_re.search(line):
+                last_structured_idx = idx
 
-        import re
+        # everything after last_structured_idx is candidate final output
+        if last_structured_idx + 1 < len(logs):
+            final_lines = logs[last_structured_idx + 1 : ]
+        else:
+            final_lines = []
 
-        text = "\n".join(final_lines).strip()
-        text = re.sub(r'\s*-\s*(\*\*[^*]+:\*\*)', r'\n- \1', text)
-        text = re.sub(r'(:)\s*\n- ', r'\1\n\n- ', text)
-        text = re.sub(r'\n{3,}', '\n\n', text).strip()
+        # If final_lines empty, fallback: find last human-readable line
+        if not final_lines:
+            for line in reversed(logs):
+                if not line:
+                    continue
+                # skip lines that clearly look structured or are small control words
+                if combined_re.search(line):
+                    continue
+                # skip single-word control tokens
+                if line.strip() in ("Allowed", "Denied"):
+                    continue
+                final_lines = [line]
+                break
 
-        final_answer_md = text
+        # Compose raw final text
+        raw = "\n".join(final_lines).strip()
 
+        # Second-layer fallback: if still empty show last available line
+        if not raw and logs:
+            raw = logs[-1].strip()
+
+        # Normalize possible inline bullets formatted like:
+        # "... as follows: - **A:** ... - **B:** ..."
+        if raw:
+            # put bullets on their own line where pattern " - **" appears
+            raw = re.sub(r'\s*-\s*(\*\*[^*]+:\*\*)', r'\n- \1', raw)
+            # ensure blank line after header ending with colon, if bullets follow
+            raw = re.sub(r'(:)\s*\n- ', r'\1\n\n- ', raw)
+            # collapse excessive blank lines
+            raw = re.sub(r'\n{3,}', '\n\n', raw).strip()
+
+        # -----------------------
+        # Display final answer
+        # -----------------------
         st.subheader("Final Answer")
-        st.markdown(final_answer_md)
+        if raw:
+            # Render as markdown; preserves bullets and formatting
+            st.markdown(raw)
+        else:
+            st.warning("Could not extract a final answer from logs.")
+            if logs:
+                st.code(logs[-1])
+
