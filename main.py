@@ -1074,7 +1074,7 @@ with tab1:
 
 
 # ------------------------------------------------
-# ✅ TAB 2 — Mongo Agent (clean display)
+# ✅ TAB 2 — Mongo Agent (clean multiline-mode)
 # ------------------------------------------------
 with tab2:
 
@@ -1118,38 +1118,43 @@ with tab2:
             st.code(str(e))
             st.stop()
 
-        # ✅ Capture logs (no duplicates, no streaming twice)
         for line in proc.stdout:
             logs.append(line.rstrip("\n"))
 
         proc.wait()
 
-        # ✅ Show logs ONCE
+        # ✅ Show logs only once
         st.subheader("📄 Execution Log")
         st.code("\n".join(logs))
 
         # ---------------------------------------------------
-        # ✅ Extract FINAL AGENT RESPONSE
+        # ✅ Extract FINAL MULTILINE ANSWER
         # ---------------------------------------------------
-        final_answer = None
-        pipeline_seen = False
+        final_lines = []
+        pipeline_found = False
 
         for line in logs:
             if line.strip().startswith("Aggregation Pipeline:"):
-                pipeline_seen = True
+                pipeline_found = True
                 continue
 
-            if pipeline_seen:
-                # The next meaningful line is the answer
-                stripped = line.strip()
-                if stripped:
-                    final_answer = stripped
-                    break
+            if pipeline_found:
+                final_lines.append(line)
 
-        # ✅ Display clean final answer
+        # ✅ Clean final answer
+        final_answer = "\n".join(
+            [l for l in final_lines if l.strip() != ""]
+        ).strip()
+
+        # ✅ Display final answer in a nice box
         st.subheader("✅ Final Answer")
+
         if final_answer:
-            st.success(final_answer)
+            st.markdown(f"""
+            <div style="padding: 16px; border-radius: 10px; background-color: #f6f6f6; border: 1px solid #ddd;">
+            <pre style="white-space: pre-wrap; font-size: 15px;">{final_answer}</pre>
+            </div>
+            """, unsafe_allow_html=True)
+
         else:
-            st.warning("⚠️ Could not extract final answer. Showing last line:")
-            st.code(logs[-1])
+            st.warning("⚠️ Could not extract final answer.")
