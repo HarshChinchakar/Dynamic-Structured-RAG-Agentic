@@ -50,7 +50,7 @@ import mimetypes
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Iterable, Union
 from pathlib import Path
-import pypdf
+
 
 # Optional Streamlit compatibility
 try:
