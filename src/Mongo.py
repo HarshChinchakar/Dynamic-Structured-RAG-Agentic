@@ -5,8 +5,8 @@ from langgraph.prebuilt import create_react_agent
 from langchain_mongodb.agent_toolkit import (
     MongoDBDatabaseToolkit,
 )
-# from MONGODB_AGENT_SYS_PROMPT import MONGODB_AGENT_SYSTEM_PROMPT
-from src.MONGODB_AGENT_SYS_PROMPT import MONGODB_AGENT_SYSTEM_PROMPT
+from MONGODB_AGENT_SYS_PROMPT import MONGODB_AGENT_SYSTEM_PROMPT
+
 
 from MogoDBDatabaseToolkitPii import MongoDBDatabasePIIToolkit
 from RegexPIIMasker import FieldBasedPIIMasker
