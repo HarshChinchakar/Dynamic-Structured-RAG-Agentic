@@ -182,12 +182,20 @@ def parse_args():
 # ------------------------------------------------------------
 # -------------- Run Locally / CLI --------------
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Mongo Document Agent CLI")
+    parser.add_argument("--email", type=str, required=True, help="User email")
+    parser.add_argument("--query", type=str, required=True, help="Natural-language query")
+    args = parser.parse_args()
+
     email = args.email
     query = args.query
 
+    # ✅ Run pipeline
     result = run_document_query(email, query)
 
-    # ✅ Extract final textual answer only
+    # ✅ Extract ONLY final answer — prevents HumanMessage JSON errors
     final_answer = (
         result.get("mongo_output")
         or result.get("final_answer")
@@ -195,9 +203,10 @@ if __name__ == "__main__":
         or ""
     )
 
+    # ✅ Fallback safe string
     if not final_answer:
-        # fallback: stringify entire dict (safe)
+        # Convert non-serializable classes to strings safely
         final_answer = str({k: str(v) for k, v in result.items()})
 
+    # ✅ Output ONLY the text
     print(final_answer)
-
