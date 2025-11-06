@@ -51,7 +51,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Iterable, Union
 from pathlib import Path
 import pypdf
-from pypdf import PdfReader
+
 # Optional Streamlit compatibility
 try:
     import streamlit as st  # type: ignore
