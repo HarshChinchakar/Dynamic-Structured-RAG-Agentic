@@ -878,7 +878,7 @@ except Exception as e:
 try:
     Emb_mod = load_src_module("embedding_Class")
     RAGIndexer = getattr(Emb_mod, "RAGIndexer")
-    st.success("✅ RAGIndexer loaded.")
+    # st.success("RAGIndexer loaded.")
 except Exception as e:
     st.error(f"Failed loading embedding_Class:")
     st.code(traceback.format_exc())
@@ -888,7 +888,7 @@ try:
     Ret_mod = load_src_module("retrival_class")
     Retriever = getattr(Ret_mod, "Retriever")
     policy_handler_from_retriever = getattr(Ret_mod, "policy_handler_from_retriever", None)
-    st.success("✅ Retriever loaded.")
+    # st.success("Retriever loaded.")
 except Exception as e:
     st.error(f"Failed loading retrival_class:")
     st.code(traceback.format_exc())
@@ -897,7 +897,7 @@ except Exception as e:
 try:
     Multi_mod = load_src_module("Mutlimedia")
     multimedia_response = getattr(Multi_mod, "multimedia_response", None)
-    st.success("✅ Mutlimedia loaded.")
+    # st.success("Mutlimedia loaded.")
 except Exception as e:
     st.warning(f"⚠️ Mutlimedia not loaded:")
     st.code(traceback.format_exc())
@@ -915,17 +915,17 @@ run_document_query = None
 try:
     App_mod = load_src_module("app")  # loads src/app.py
 
-    st.write("📌 Checking attributes inside app.py…")
+    # st.write("Checking attributes inside app.py…")
     attrs = dir(App_mod)
     st.json([x for x in attrs if not x.startswith("_")])
 
     if "run_document_query" in attrs:
         run_document_query = getattr(App_mod, "run_document_query")
-        st.success("✅ Found `run_document_query()`")
+        # st.success("Found `run_document_query()`")
     else:
-        st.error("❌ `run_document_query` NOT FOUND in app.py")
+        # st.error("`run_document_query` NOT FOUND in app.py")
 except Exception as e:
-    st.error("❌ Error loading app.py:")
+    # st.error("Error loading app.py:")
     st.code(traceback.format_exc())
 
 
@@ -962,14 +962,14 @@ with tab1:
     rebuild = st.button("Rebuild Embeddings (force)")
     if rebuild:
         st.session_state.rag_cache = None
-        st.info("✅ Cache cleared, embeddings will rebuild on next Run.")
+        st.info("[Done] Cache cleared, embeddings will rebuild on next Run.")
 
     POLICIES_PATH = os.path.join(ROOT_DIR, "Dataset", "Policies")
     st.write("📁 Policy Directory:", POLICIES_PATH)
 
     # FUNCTION
     def build_index_debug():
-        st.write("🔥 Building index with FULL DEBUG...")
+        st.write("Building index with FULL DEBUG...")
 
         try:
             idx = RAGIndexer(
@@ -985,9 +985,9 @@ with tab1:
             st.write("📌 Calling idx.build() ...")
             idx.build()
 
-            st.write("✅ Texts extracted:", len(idx.texts))
-            st.write("✅ Embeddings shape:", idx.vectors.shape if idx.vectors is not None else "None")
-            st.write("✅ Sample metadata:", idx.metadatas[:3])
+            st.write("Texts extracted:", len(idx.texts))
+            st.write("Embeddings shape:", idx.vectors.shape if idx.vectors is not None else "None")
+            st.write("Sample metadata:", idx.metadatas[:3])
 
             st.session_state.rag_cache = {
                 "texts": idx.texts,
@@ -996,10 +996,10 @@ with tab1:
                 "embed_model": idx.cfg.embed_model,
             }
 
-            st.success("✅ Embedding SUCCESS — stored to RAM")
+            st.success("Embedding SUCCESS — stored to RAM")
 
         except Exception as e:
-            st.error("❌ Embedding failed:")
+            st.error("Embedding failed:")
             st.code(traceback.format_exc())
 
     if st.session_state.rag_cache is None:
@@ -1033,7 +1033,7 @@ with tab1:
             st.code(traceback.format_exc())
             st.stop()
 
-        st.write("📌 Running retriever.retrieve() ...")
+        st.write("Running retriever.retrieve() ...")
         try:
             ret = retr.retrieve(q, top_k=10, rerank=True)
         except Exception as e:
@@ -1041,7 +1041,7 @@ with tab1:
             st.code(traceback.format_exc())
             st.stop()
 
-        st.write("✅ Retriever output (RAW):")
+        st.write("Retriever output (RAW):")
         st.json(ret)
 
         if "error" in ret:
@@ -1051,15 +1051,15 @@ with tab1:
         candidates = ret.get("candidates", [])
         chunks = [c["text"] for c in candidates]
 
-        st.subheader("📄 Retrieved Chunks (Top 10)")
+        st.subheader("Retrieved Chunks (Top 10)")
         for i, c in enumerate(chunks):
             st.code(f"[Chunk {i+1}] {c[:800]}")
 
-        st.header("🧠 LLM ANSWER — DEBUG MODE")
+        st.header("LLM ANSWER - ")
 
         try:
             if multimedia_response:
-                st.write("📌 Using Mutlimedia.multimedia_response()")
+                st.write("Using Mutlimedia.multimedia_response()")
                 final_ans = multimedia_response(q, chunks)
             else:
                 st.write("⚠️ Mutlimedia not available, fallback.")
@@ -1069,7 +1069,7 @@ with tab1:
             st.code(traceback.format_exc())
             final_ans = f"[ERROR] {e}"
 
-        st.subheader("✅ FINAL ANSWER")
+        st.subheader("FINAL ANSWER")
         st.write(final_ans)
 
         st.session_state.query_to_run = None
@@ -1126,7 +1126,7 @@ with tab2:
         proc.wait()
 
         # ✅ Show logs only once
-        st.subheader("📄 Execution Log")
+        st.subheader("Execution Log")
         st.code("\n".join(logs))
 
         # ---------------------------------------------------
@@ -1167,5 +1167,5 @@ with tab2:
         final_answer_md = text
         
         # ✅ Display final answer once, in theme-aware style (no custom HTML box)
-        st.subheader("✅ Final Answer")
+        st.subheader("Final Answer")
         st.markdown(final_answer_md)
