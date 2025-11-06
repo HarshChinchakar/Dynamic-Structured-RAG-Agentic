@@ -69,13 +69,61 @@ def extract_text(resp):
 # ============================
 # ✅ FAST MULTIMEDIA RESPONSE
 # ============================
-def multimedia_response(query: str, context_chunks: list[str]) -> str:
+# def multimedia_response(query: str, context_chunks: list[str]) -> str:
+#     """
+#     FAST version:
+#     - Uses OpenAI Responses API
+#     - Shorter context
+#     - Trims each chunk
+#     - Much lower latency
+#     """
+
+#     try:
+#         api_key = get_api_key()
+#         client = OpenAI(api_key=api_key)
+
+#         # Trim long chunks
+#         trimmed_chunks = []
+#         for c in context_chunks:
+#             c = c.strip()
+#             if len(c) > CHUNK_CHAR_LIMIT:
+#                 c = c[:CHUNK_CHAR_LIMIT] + "...[truncated]"
+#             trimmed_chunks.append(c)
+
+#         context = "\n---\n".join(trimmed_chunks)
+
+#         prompt = f"""
+# Answer the question ONLY using the context below.
+
+# If the answer is not explicitly present, reply exactly:
+# "I don't have enough information in the provided documents."
+
+# CONTEXT:
+# {context}
+
+# QUESTION: {query}
+
+# Answer concisely.
+# """
+
+#         # ✅ This API is the fastest available
+#         response = client.responses.create(
+#             model=MODEL_NAME,
+#             input=prompt,
+#             max_output_tokens=MAX_TOKENS,
+#             temperature=TEMPERATURE
+#         )
+
+#         return extract_text(response)
+
+#     except Exception as e:
+#         return f"[ERROR] multimedia_response failed: {e}\n{traceback.format_exc()}"
+
+def multimedia_response(query: str, context_chunks: list[str]) -> str: 
     """
-    FAST version:
-    - Uses OpenAI Responses API
-    - Shorter context
-    - Trims each chunk
-    - Much lower latency
+    Policy-aware, hallucination-safe multimedia response generator.
+    Allows INDIRECT inference from policy context.
+    Strictly prevents hallucinations.
     """
 
     try:
@@ -92,21 +140,40 @@ def multimedia_response(query: str, context_chunks: list[str]) -> str:
 
         context = "\n---\n".join(trimmed_chunks)
 
+        # New hallucination-safe, inference-friendly prompt
         prompt = f"""
-Answer the question ONLY using the context below.
+            You are an HR Policy Assistant.  
+            Your job is to answer using ONLY the information found inside the provided context.
+            
+             You ARE allowed to make **logical inferences** when the information is implied:
+               - Example: If policy states "All full-time employees receive X", you may infer
+                 the benefit applies to any full-time employee even if not stated explicitly.
+               - Example: If a rule describes reimbursement rules, you may apply the rule to
+                 similar expense cases even if that specific example is not shown.
+            
+            [IMPORTANT] You are NOT allowed to hallucinate missing details.
+            [IMPORTANT] Never invent numbers, dates, names, amounts, or policy clauses that are not present or inferable.
+            [IMPORTANT] If the answer cannot be found or inferred from the context, reply EXACTLY:
+            
+            "I don't have enough information in the provided documents."
+            
+            Do NOT reveal any confidential, sensitive, or private information.
+            Keep answers strictly within HR & policy interpretation boundaries.
+            nsure responses are clear, accurate, and concise.
+            
+            -----------------------------------
+            CONTEXT:
+            {context}
+            -----------------------------------
+            
+            QUESTION:
+            {query}
+            
+            Now produce the **best possible answer using the context and valid inferences only**.
+            If insufficient context is available, reply with the exact fallback sentence.
+            """
 
-If the answer is not explicitly present, reply exactly:
-"I don't have enough information in the provided documents."
-
-CONTEXT:
-{context}
-
-QUESTION: {query}
-
-Answer concisely.
-"""
-
-        # ✅ This API is the fastest available
+        #  Call the fast Responses API
         response = client.responses.create(
             model=MODEL_NAME,
             input=prompt,
