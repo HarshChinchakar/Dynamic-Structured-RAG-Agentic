@@ -129,17 +129,25 @@ class NaturalLanguageToMQL:
         for event in events:
             self.messages.extend(event["messages"])
 
-    def print_results(self):
-        if self.messages:
-            final_output = self.messages[-1].content
-            # print("🔒 Masked Output:")
-            # print(final_output)
-
-            unmasked_output = self.pii_masker.unmask({"content": final_output})["content"]
-            # print("\n🔓 Unmasked Output:")
-            print(unmasked_output)
-        else:
+    def print_results(self, return_output=False):
+        if not self.messages:
+            if return_output:
+                return None
             print("No messages to display.")
+            return
+    
+        final_output = self.messages[-1].content
+    
+        # Unmask
+        unmasked_output = self.pii_masker.unmask({"content": final_output})["content"]
+    
+        # If Streamlit requests the raw value
+        if return_output:
+            return unmasked_output
+    
+        # Otherwise print normally (CLI mode)
+        print(unmasked_output)
+
 
 
 # converter = NaturalLanguageToMQL()
