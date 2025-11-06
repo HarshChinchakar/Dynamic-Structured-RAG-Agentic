@@ -1074,9 +1074,6 @@ with tab1:
 
 
 # ------------------------------------------------
-# ✅ TAB 2 — Mongo Document Agent (with ultra-logs)
-# ------------------------------------------------
-# ------------------------------------------------
 # ✅ TAB 2 — Mongo Document Agent (uv-run JSON mode)
 # ------------------------------------------------
 with tab2:
@@ -1099,10 +1096,10 @@ with tab2:
         import subprocess, json as _json, shlex
 
         uv_cmd = [
-            "uv", "run", "src/app.py", 
+            "uv", "run", "--active",  # ✅ <-- ONLY here, NOT passed to app.py
+            "src/app.py",
             "--email", email,
-            "--query", query,
-            "--active"
+            "--query", query
         ]
 
         st.write("### 🔧 Running command:")
@@ -1130,7 +1127,7 @@ with tab2:
         # -------------------------------------------
         for line in proc.stdout:
             logs.append(line.rstrip("\n"))
-            log_box.code("\n".join(logs[-200:]))  # show last 200 lines
+            log_box.code("\n".join(logs[-200:]))
 
         proc.wait()
 
@@ -1141,10 +1138,9 @@ with tab2:
         st.code("\n".join(logs))
 
         # -------------------------------------------
-        # ✅ Extract JSON (app.py ALWAYS prints JSON last)
+        # ✅ Extract final JSON printed by app.py
         # -------------------------------------------
         st.subheader("✅ Final Output")
-
         try:
             final_json = _json.loads(logs[-1])
             st.json(final_json)
