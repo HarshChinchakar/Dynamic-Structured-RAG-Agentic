@@ -945,209 +945,135 @@ tab1, tab2 = st.tabs(["📘 Policy RAG (Existing Debug Mode)", "🗄️ Document
 # ------------------------------------------------
 with tab1:
     st.header("📘 Policy RAG — DEBUG MODE (Unchanged)")
-    # ✅ your entire tab1 code is left untouched
-    # (keeping for brevity — unchanged)
-    # PASTE TAB 1 EXACTLY AS YOU ALREADY HAVE
+
+    # STATE INIT
+    if "rag_cache" not in st.session_state:
+        st.session_state.rag_cache = None
+
+    if "query_to_run" not in st.session_state:
+        st.session_state.query_to_run = None
+
+    # INPUTS
+    user_query = st.text_area("Enter your question", height=150)
+    run = st.button("Run Query (Policy Only)")
+
+    rebuild = st.button("Rebuild Embeddings (force)")
+    if rebuild:
+        st.session_state.rag_cache = None
+        st.info("✅ Cache cleared, embeddings will rebuild on next Run.")
+
+    POLICIES_PATH = os.path.join(ROOT_DIR, "Dataset", "Policies")
+    st.write("📁 Policy Directory:", POLICIES_PATH)
+
+    # FUNCTION
+    def build_index_debug():
+        st.write("🔥 Building index with FULL DEBUG...")
+
+        try:
+            idx = RAGIndexer(
+                local_paths=[POLICIES_PATH],
+                s3_urls=None,
+                workdir="rag_work",
+                embed_model="text-embedding-3-large",
+                max_tokens=900,
+                overlap=150,
+                min_chunk_chars=280,
+            )
+
+            st.write("📌 Calling idx.build() ...")
+            idx.build()
+
+            st.write("✅ Texts extracted:", len(idx.texts))
+            st.write("✅ Embeddings shape:", idx.vectors.shape if idx.vectors is not None else "None")
+            st.write("✅ Sample metadata:", idx.metadatas[:3])
+
+            st.session_state.rag_cache = {
+                "texts": idx.texts,
+                "vectors": idx.vectors,
+                "metadatas": idx.metadatas,
+                "embed_model": idx.cfg.embed_model,
+            }
+
+            st.success("✅ Embedding SUCCESS — stored to RAM")
+
+        except Exception as e:
+            st.error("❌ Embedding failed:")
+            st.code(traceback.format_exc())
+
+    if st.session_state.rag_cache is None:
+        build_index_debug()
+
+    if run:
+        if not user_query.strip():
+            st.warning("Enter a valid query.")
+            st.stop()
+
+        st.session_state.query_to_run = user_query.strip()
+
+    if st.session_state.query_to_run:
+        q = st.session_state.query_to_run
+
+        st.markdown("---")
+        st.header("🔎 DEBUG EXECUTION — POLICY ONLY")
+
+        cache = st.session_state.rag_cache
+
+        st.write("🧠 Creating retriever with cached embeddings...")
+        try:
+            retr = Retriever(
+                texts=cache["texts"],
+                vectors=cache["vectors"],
+                metadatas=cache["metadatas"],
+                embed_model=cache["embed_model"],
+            )
+        except Exception as e:
+            st.error("Retriever creation failed:")
+            st.code(traceback.format_exc())
+            st.stop()
+
+        st.write("📌 Running retriever.retrieve() ...")
+        try:
+            ret = retr.retrieve(q, top_k=10, rerank=True)
+        except Exception as e:
+            st.error("Retriever failed:")
+            st.code(traceback.format_exc())
+            st.stop()
+
+        st.write("✅ Retriever output (RAW):")
+        st.json(ret)
+
+        if "error" in ret:
+            st.error("Retriever returned error:", ret["error"])
+            st.stop()
+
+        candidates = ret.get("candidates", [])
+        chunks = [c["text"] for c in candidates]
+
+        st.subheader("📄 Retrieved Chunks (Top 10)")
+        for i, c in enumerate(chunks):
+            st.code(f"[Chunk {i+1}] {c[:800]}")
+
+        st.header("🧠 LLM ANSWER — DEBUG MODE")
+
+        try:
+            if multimedia_response:
+                st.write("📌 Using Mutlimedia.multimedia_response()")
+                final_ans = multimedia_response(q, chunks)
+            else:
+                st.write("⚠️ Mutlimedia not available, fallback.")
+                final_ans = "\n\n-----------\n\n".join(chunks)
+        except Exception as e:
+            st.error("LLM Answer generation failed:")
+            st.code(traceback.format_exc())
+            final_ans = f"[ERROR] {e}"
+
+        st.subheader("✅ FINAL ANSWER")
+        st.write(final_ans)
+
+        st.session_state.query_to_run = None
 
 
 # ------------------------------------------------
 # ✅ TAB 2 — Mongo Document Agent (with ultra-logs)
 # ------------------------------------------------
 with tab2:
-
-    st.header("🗄️ Mongo Document Query — HR BOT")
-    st.markdown("Enter **email** + **document query** to run the HR Mongo Agent.")
-
-    email = st.text_input("User Email")
-    query = st.text_area("Document Query", height=150)
-
-    if st.button("Run Document Query"):
-
-        if not email.strip() or not query.strip():
-            st.warning("⚠️ Please enter BOTH Email and Query.")
-            st.stop()
-
-        st.markdown("### 🔍 Running `app.py`…")
-
-        # ---------------------------------------------------------
-        # ✅ 1. LOAD THE MODULE ALWAYS
-        # ---------------------------------------------------------
-        with tab1:
-            st.header("📘 Policy RAG — DEBUG MODE (Unchanged)")
-        
-            # STATE INIT
-            if "rag_cache" not in st.session_state:
-                st.session_state.rag_cache = None
-        
-            if "query_to_run" not in st.session_state:
-                st.session_state.query_to_run = None
-        
-            # INPUTS
-            user_query = st.text_area("Enter your question", height=150)
-            run = st.button("Run Query (Policy Only)")
-        
-            rebuild = st.button("Rebuild Embeddings (force)")
-            if rebuild:
-                st.session_state.rag_cache = None
-                st.info("✅ Cache cleared, embeddings will rebuild on next Run.")
-        
-            POLICIES_PATH = os.path.join(ROOT_DIR, "Dataset", "Policies")
-            st.write("📁 Policy Directory:", POLICIES_PATH)
-        
-            # FUNCTION
-            def build_index_debug():
-                st.write("🔥 Building index with FULL DEBUG...")
-        
-                try:
-                    idx = RAGIndexer(
-                        local_paths=[POLICIES_PATH],
-                        s3_urls=None,
-                        workdir="rag_work",
-                        embed_model="text-embedding-3-large",
-                        max_tokens=900,
-                        overlap=150,
-                        min_chunk_chars=280,
-                    )
-        
-                    st.write("📌 Calling idx.build() ...")
-                    idx.build()
-        
-                    st.write("✅ Texts extracted:", len(idx.texts))
-                    st.write("✅ Embeddings shape:", idx.vectors.shape if idx.vectors is not None else "None")
-                    st.write("✅ Sample metadata:", idx.metadatas[:3])
-        
-                    st.session_state.rag_cache = {
-                        "texts": idx.texts,
-                        "vectors": idx.vectors,
-                        "metadatas": idx.metadatas,
-                        "embed_model": idx.cfg.embed_model,
-                    }
-        
-                    st.success("✅ Embedding SUCCESS — stored to RAM")
-        
-                except Exception as e:
-                    st.error("❌ Embedding failed:")
-                    st.code(traceback.format_exc())
-        
-            if st.session_state.rag_cache is None:
-                build_index_debug()
-        
-            if run:
-                if not user_query.strip():
-                    st.warning("Enter a valid query.")
-                    st.stop()
-        
-                st.session_state.query_to_run = user_query.strip()
-        
-            if st.session_state.query_to_run:
-                q = st.session_state.query_to_run
-        
-                st.markdown("---")
-                st.header("🔎 DEBUG EXECUTION — POLICY ONLY")
-        
-                cache = st.session_state.rag_cache
-        
-                st.write("🧠 Creating retriever with cached embeddings...")
-                try:
-                    retr = Retriever(
-                        texts=cache["texts"],
-                        vectors=cache["vectors"],
-                        metadatas=cache["metadatas"],
-                        embed_model=cache["embed_model"],
-                    )
-                except Exception as e:
-                    st.error("Retriever creation failed:")
-                    st.code(traceback.format_exc())
-                    st.stop()
-        
-                st.write("📌 Running retriever.retrieve() ...")
-                try:
-                    ret = retr.retrieve(q, top_k=10, rerank=True)
-                except Exception as e:
-                    st.error("Retriever failed:")
-                    st.code(traceback.format_exc())
-                    st.stop()
-        
-                st.write("✅ Retriever output (RAW):")
-                st.json(ret)
-        
-                if "error" in ret:
-                    st.error("Retriever returned error:", ret["error"])
-                    st.stop()
-        
-                candidates = ret.get("candidates", [])
-                chunks = [c["text"] for c in candidates]
-        
-                st.subheader("📄 Retrieved Chunks (Top 10)")
-                for i, c in enumerate(chunks):
-                    st.code(f"[Chunk {i+1}] {c[:800]}")
-        
-                st.header("🧠 LLM ANSWER — DEBUG MODE")
-        
-                try:
-                    if multimedia_response:
-                        st.write("📌 Using Mutlimedia.multimedia_response()")
-                        final_ans = multimedia_response(q, chunks)
-                    else:
-                        st.write("⚠️ Mutlimedia not available, fallback.")
-                        final_ans = "\n\n-----------\n\n".join(chunks)
-                except Exception as e:
-                    st.error("LLM Answer generation failed:")
-                    st.code(traceback.format_exc())
-                    final_ans = f"[ERROR] {e}"
-        
-                st.subheader("✅ FINAL ANSWER")
-                st.write(final_ans)
-        
-                st.session_state.query_to_run = None
-        
-                # ---------------------------------------------------------
-                # ✅ 2. Inject parameters into the script
-                # ---------------------------------------------------------
-                try:
-                    App_mod.email = email
-                    App_mod.NATURAL_LANGUAGE_QUERY = query
-                    st.write("✅ Injected parameters into app.py:")
-                    st.json({
-                        "email": email,
-                        "query": query
-                    })
-                except Exception:
-                    st.error("❌ Failed injecting parameters into app.py:")
-                    st.code(traceback.format_exc())
-                    st.stop()
-        
-                # ---------------------------------------------------------
-                # ✅ 3. CAPTURE app.py OUTPUT
-                # ---------------------------------------------------------
-                import io
-                import contextlib
-        
-                buffer = io.StringIO()
-
-        st.markdown("### 📄 Raw Execution Log (from app.py)")
-        try:
-            with contextlib.redirect_stdout(buffer):
-                # ✅ If app.py has a main(), use it. Else re-run top-level code.
-                if hasattr(App_mod, "main"):
-                    App_mod.main()
-                else:
-                    # Re-run the module code safely
-                    spec = importlib.util.spec_from_file_location("src.app", os.path.join(SRC_DIR, "app.py"))
-                    mod = importlib.util.module_from_spec(spec)
-
-                    # Inject params before execution
-                    mod.email = email
-                    mod.NATURAL_LANGUAGE_QUERY = query
-
-                    spec.loader.exec_module(mod)
-
-            full_output = buffer.getvalue()
-            st.code(full_output)
-
-            st.success("✅ app.py executed successfully")
-
-        except Exception as e:
-            st.error("❌ app.py crashed:")
-            st.code(traceback.format_exc())
-            st.stop()
