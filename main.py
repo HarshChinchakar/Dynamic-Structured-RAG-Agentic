@@ -1130,31 +1130,40 @@ with tab2:
         # ---------------------------------------------------
         # ✅ Extract FINAL MULTILINE ANSWER
         # ---------------------------------------------------
+        # ---------------------------------------------------
+        # ✅ Extract FINAL MULTILINE ANSWER
+        # ---------------------------------------------------
         final_lines = []
         pipeline_found = False
-
+        
         for line in logs:
             if line.strip().startswith("Aggregation Pipeline:"):
                 pipeline_found = True
                 continue
-
             if pipeline_found:
                 final_lines.append(line)
-
-        # ✅ Clean final answer
-        final_answer = "\n".join(
-            [l for l in final_lines if l.strip() != ""]
-        ).strip()
-
-        # ✅ Display final answer in a nice box
+        
+        # Raw answer as emitted after the pipeline
+        final_answer_raw = "\n".join(final_lines).strip()
+        
+        # --- Normalize into proper Markdown bullets when the model prints
+        #     on one line like: "... as follows: - **A:** ... - **B:** ..."
+        import re
+        
+        text = final_answer_raw
+        
+        # 1) put each bullet on its own line (before " - **Bold:**")
+        text = re.sub(r'\s*-\s*(\*\*[^*]+:\*\*)', r'\n- \1', text)
+        
+        # 2) ensure a blank line after the header line ending with a colon
+        #    e.g. "… as follows:" -> (blank line) -> "- **Status:** …"
+        text = re.sub(r'(:)\s*\n- ', r'\1\n\n- ', text)
+        
+        # 3) collapse any duplicated blank lines (optional but tidy)
+        text = re.sub(r'\n{3,}', '\n\n', text).strip()
+        
+        final_answer_md = text
+        
+        # ✅ Display final answer once, in theme-aware style (no custom HTML box)
         st.subheader("✅ Final Answer")
-
-        if final_answer:
-            st.markdown(f"""
-            <div style="padding: 16px; border-radius: 10px; background-color: #f6f6f6; border: 1px solid #ddd;">
-            <pre style="white-space: pre-wrap; font-size: 15px;">{final_answer}</pre>
-            </div>
-            """, unsafe_allow_html=True)
-
-        else:
-            st.warning("⚠️ Could not extract final answer.")
+        st.markdown(final_answer_md)
