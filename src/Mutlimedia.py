@@ -1,165 +1,144 @@
+#!/usr/bin/env python3
+"""
+multimedia.py  (FAST VERSION)
+
+Ultra-optimized final answer generator.
+Uses the new OpenAI Responses API (much faster and very stable).
+Shorter prompt, smaller token usage, trimmed chunks.
+"""
+
 import os
 import traceback
 from dotenv import load_dotenv
 
-# Optional Streamlit import (for secrets)
+# Optional Streamlit import
 try:
     import streamlit as st
-except ImportError:
+except Exception:
     st = None
 
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from langchain_community.vectorstores import Chroma
-from langchain.chains import RetrievalQA
-from langchain.prompts import PromptTemplate
+from openai import OpenAI
 
-# ===========================================
-# 🔧 CONFIGURATION
-# ===========================================
+# ============================
+# 🔧 CONFIG
+# ============================
 load_dotenv()
 
-MODEL_NAME = "gpt-4o-mini"
-TEMPERATURE = 0.4
-MAX_TOKENS = 4096
-IN_MEMORY_CHROMA_LIMIT = 200_000  # Max token count in memory
+MODEL_NAME = "gpt-4o-mini"        # Fast + strong
+TEMPERATURE = 0.2
+MAX_TOKENS = 1024                 # Smaller = faster
 
-# ------------------ API Key Handling ------------------
-try:
-    OPENAI_API_KEY = None
+# Limit context size per chunk
+CHUNK_CHAR_LIMIT = 1200           # Reduce to 800 for even more speed
+
+
+# ============================
+# ✅ API KEY HANDLING
+# ============================
+def get_api_key():
+    api_key = None
+
     if st and hasattr(st, "secrets"):
-        OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
-    if not OPENAI_API_KEY:
-        OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    if not OPENAI_API_KEY:
-        raise ValueError("Missing OPENAI_API_KEY in Streamlit secrets or .env")
-except Exception as e:
-    print(f"[ERROR] Unable to load API key: {e}")
-    OPENAI_API_KEY = None
+        api_key = st.secrets.get("OPENAI_API_KEY")
+
+    if not api_key:
+        api_key = os.getenv("OPENAI_API_KEY")
+
+    if not api_key:
+        raise RuntimeError("Missing OPENAI_API_KEY")
+
+    return api_key
 
 
-# ===========================================
-# 🧠 LLM + PROMPT SETUP
-# ===========================================
-PROMPT = PromptTemplate(
-    template="""Context:
+# ============================
+# ✅ SAFE EXTRACTOR
+# ============================
+def extract_text(resp):
+    """
+    Safely extract content from Responses API output.
+    """
+    try:
+        c = resp.output_text
+        if isinstance(c, str):
+            return c.strip()
+        return str(c)
+    except:
+        return str(resp)
+
+
+# ============================
+# ✅ FAST MULTIMEDIA RESPONSE
+# ============================
+def multimedia_response(query: str, context_chunks: list[str]) -> str:
+    """
+    FAST version:
+    - Uses OpenAI Responses API
+    - Shorter context
+    - Trims each chunk
+    - Much lower latency
+    """
+
+    try:
+        api_key = get_api_key()
+        client = OpenAI(api_key=api_key)
+
+        # Trim long chunks
+        trimmed_chunks = []
+        for c in context_chunks:
+            c = c.strip()
+            if len(c) > CHUNK_CHAR_LIMIT:
+                c = c[:CHUNK_CHAR_LIMIT] + "...[truncated]"
+            trimmed_chunks.append(c)
+
+        context = "\n---\n".join(trimmed_chunks)
+
+        prompt = f"""
+Answer the question ONLY using the context below.
+
+If the answer is not explicitly present, reply exactly:
+"I don't have enough information in the provided documents."
+
+CONTEXT:
 {context}
 
-Question:
-{question}
+QUESTION: {query}
 
-Answer concisely and only based on the given context.
-If the context does not provide sufficient information, say:
-"I don't have enough information to answer that question."
-""",
-    input_variables=["context", "question"]
-)
+Answer concisely.
+"""
 
-
-def init_llm():
-    """Initialize ChatOpenAI model safely."""
-    try:
-        return ChatOpenAI(
-            api_key=OPENAI_API_KEY,
-            model_name=MODEL_NAME,
-            temperature=TEMPERATURE,
-            max_tokens=MAX_TOKENS
-        )
-    except Exception as e:
-        raise RuntimeError(f"LLM initialization failed: {e}")
-
-
-# ===========================================
-# ⚙️ GLOBAL IN-MEMORY DB CACHE
-# ===========================================
-CHROMA_CACHE = {}
-
-
-def load_in_memory_vectorstore(embeddings, docs, collection_name="ram_store"):
-    """Create an in-memory Chroma DB and cache it globally."""
-    try:
-        vectorstore = Chroma.from_texts(
-            texts=docs,
-            embedding=embeddings,
-            collection_name=collection_name
-        )
-        CHROMA_CACHE[collection_name] = vectorstore
-        return vectorstore
-    except Exception as e:
-        raise RuntimeError(f"In-memory vectorstore creation failed: {e}")
-
-
-def get_cached_vectorstore(collection_name="ram_store"):
-    """Retrieve cached Chroma vectorstore if available."""
-    return CHROMA_CACHE.get(collection_name)
-
-
-# ===========================================
-# 🧩 RAG RETRIEVAL + ANSWERING
-# ===========================================
-def policy_handler(query: str, collection_name="ram_store"):
-    """
-    Perform retrieval + LLM answering using cached in-memory Chroma DB.
-    Returns: (answer: str, retrieved_docs: list[str])
-    """
-    try:
-        # 1️⃣ Retrieve cached DB
-        vectorstore = get_cached_vectorstore(collection_name)
-        if not vectorstore:
-            return (
-                "ERROR: No in-memory Chroma DB found. "
-                "Upload and embed policy documents first before querying.",
-                []
-            )
-
-        # 2️⃣ Retrieve context manually before QA
-        retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-        retrieved_docs = retriever.get_relevant_documents(query)
-        retrieved_chunks = [doc.page_content for doc in retrieved_docs]
-
-        if not retrieved_chunks:
-            return ("ERROR: No relevant chunks retrieved from vectorstore.", [])
-
-        # 3️⃣ Initialize LLM + chain
-        llm = init_llm()
-        qa = RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="stuff",
-            retriever=retriever,
-            chain_type_kwargs={"prompt": PROMPT}
+        # ✅ This API is the fastest available
+        response = client.responses.create(
+            model=MODEL_NAME,
+            input=prompt,
+            max_output_tokens=MAX_TOKENS,
+            temperature=TEMPERATURE
         )
 
-        # 4️⃣ Generate response (using invoke instead of deprecated run)
-        response = qa.invoke({"query": query})
-        if not response or not response.get("result"):
-            return ("ERROR: Empty response returned from QA model.", retrieved_chunks)
-
-        final_answer = response["result"].strip()
-        return (final_answer, retrieved_chunks)
+        return extract_text(response)
 
     except Exception as e:
-        err_msg = f"ERROR: Policy handler failed: {e}\n{traceback.format_exc()}"
-        return (err_msg, [])
+        return f"[ERROR] multimedia_response failed: {e}\n{traceback.format_exc()}"
 
 
-# ===========================================
-# 🧹 MEMORY MANAGEMENT HELPERS
-# ===========================================
-def clear_cache():
-    """Safely clear the in-memory Chroma cache."""
-    try:
-        CHROMA_CACHE.clear()
-        return "✅ In-memory Chroma cache cleared."
-    except Exception as e:
-        return f"ERROR: Failed to clear cache: {e}"
+# ============================
+# ✅ STANDALONE TESTING
+# ============================
+if __name__ == "__main__":
+    print("\n=== FAST MULTIMEDIA TEST ===\n")
 
+    q = input("Query:\n> ").strip()
 
-def cache_status():
-    """Return info about current cache usage."""
-    try:
-        collections = list(CHROMA_CACHE.keys())
-        return {
-            "collections_loaded": collections,
-            "total_collections": len(collections)
-        }
-    except Exception as e:
-        return {"error": f"Failed to get cache status: {e}"}
+    print("\nEnter context chunks (finish with empty line):")
+    chunks = []
+    while True:
+        line = input()
+        if not line.strip():
+            break
+        chunks.append(line)
+
+    print("\n[RUNNING FAST LLM]\n")
+    ans = multimedia_response(q, chunks)
+
+    print("\n========= ANSWER =========\n")
+    print(ans)
+    print("\n==========================\n")
