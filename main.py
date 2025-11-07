@@ -767,3 +767,232 @@ with tab2:
             if logs:
                 st.code(logs[-1])
 
+# ------------------------------------------------
+# TAB 3 — Router (Policy <> Document) — NEW
+# ------------------------------------------------
+tab3 = st.tab("🔀 Router (Auto-route)") if False else None  # placeholder if you want to reorder tabs visually
+
+# If you want actual three-tab layout, do: tab1, tab2, tab3 = st.tabs([...]) above.
+# But assuming you already have tab1 and tab2 created, create a new panel:
+with st.container():
+    st.header("🔀 Router — Auto route to Policy or Document")
+
+    router_query = st.text_area("Enter query to route", height=140)
+    router_email = st.text_input("User Email (for document queries)", value="")  # optional for policy
+
+    run_router = st.button("Route & Execute")
+
+    if run_router:
+        if not router_query.strip():
+            st.warning("Enter a query to route.")
+            st.stop()
+
+        # 1) Run classifier (safe)
+        st.markdown("### 1) Classification")
+        if classify_query is None:
+            st.error("Router not available (classify_query not loaded).")
+            st.stop()
+
+        try:
+            cls_out = classify_query(router_query)
+        except Exception as e:
+            st.error("Router call failed:")
+            st.code(traceback.format_exc())
+            st.stop()
+
+        # cls_out is either a tuple or an error dict
+        if isinstance(cls_out, dict) and "error" in cls_out:
+            st.error("Router returned an error")
+            st.json(cls_out)
+            st.stop()
+
+        # Expect: (route, confidence, reason, doc_q, pol_q)
+        route, confidence, reason, doc_q, pol_q = cls_out
+        st.write("Route:", str(route))
+        st.write("Confidence:", confidence)
+        st.write("Reason:", reason)
+
+        # Freeze BOTH: fallback policy behavior (inform user)
+        if str(route).lower() == "both":
+            st.info("Route 'BOTH' received — currently not supported. Falling back to POLICY route.")
+            route = "policy"
+            # use policy subquery if available
+            if pol_q:
+                router_query_to_run = pol_q
+            else:
+                router_query_to_run = router_query
+
+        # ---------------------------
+        # POLICY route -> reuse Tab 1 logic (retriever + multimedia)
+        # ---------------------------
+        if str(route).lower() == "policy":
+            st.markdown("### 2) Executing POLICY flow (Policy RAG)")
+
+            # ensure embeddings exist (calling the same builder as Tab1)
+            if st.session_state.get("rag_cache") is None:
+                # call the same build function used in Tab1 (inline here)
+                try:
+                    idx = RAGIndexer(
+                        local_paths=[POLICIES_PATH],
+                        s3_urls=None,
+                        workdir="rag_work",
+                        embed_model="text-embedding-3-large",
+                        max_tokens=900,
+                        overlap=150,
+                        min_chunk_chars=280,
+                    )
+                    idx.build()
+                    st.session_state.rag_cache = {
+                        "texts": idx.texts,
+                        "vectors": idx.vectors,
+                        "metadatas": idx.metadatas,
+                        "embed_model": idx.cfg.embed_model,
+                    }
+                    st.success("Embeddings built and cached.")
+                except Exception:
+                    st.error("Failed building embeddings for policy flow:")
+                    st.code(traceback.format_exc())
+                    st.stop()
+
+            cache = st.session_state.rag_cache
+            # Create retriever and run retrieval (same as Tab1)
+            try:
+                retr_local = Retriever(
+                    texts=cache["texts"],
+                    vectors=cache["vectors"],
+                    metadatas=cache["metadatas"],
+                    embed_model=cache["embed_model"],
+                )
+            except Exception:
+                st.error("Retriever creation failed (policy):")
+                st.code(traceback.format_exc())
+                st.stop()
+
+            # run retrieval
+            try:
+                policy_query_to_run = pol_q or router_query  # prefer pol_q if router suggested
+                ret_policy = retr_local.retrieve(policy_query_to_run, top_k=10, rerank=True)
+            except Exception:
+                st.error("Retriever failed (policy):")
+                st.code(traceback.format_exc())
+                st.stop()
+
+            # Show retrieved JSON in collapsed expander (same UX as Tab1)
+            with st.expander("Retrieved Result JSON (Click to Expand)", expanded=False):
+                st.json(ret_policy)
+
+            # Show chunks collapsed (same UX as Tab1)
+            candidates = ret_policy.get("candidates", [])
+            chunks_policy = [c["text"] for c in candidates]
+            with st.expander("Retrieved Chunks (Click to Expand)", expanded=False):
+                for i, c in enumerate(chunks_policy):
+                    st.markdown(f"### Chunk {i+1}")
+                    st.code(c)
+
+            # Final answer via multimedia_response or concat — reuse Tab1 logic
+            try:
+                if multimedia_response:
+                    final_ans_policy = multimedia_response(policy_query_to_run, chunks_policy)
+                else:
+                    final_ans_policy = "\n\n-----------\n\n".join(chunks_policy)
+            except Exception:
+                st.error("LLM Answer generation failed (policy):")
+                st.code(traceback.format_exc())
+                final_ans_policy = f"[ERROR] {traceback.format_exc()}"
+
+            st.subheader("Policy Answer")
+            st.write(final_ans_policy)
+
+        # ---------------------------
+        # DOCUMENT route -> reuse Tab 2 logic (uv subprocess call)
+        # ---------------------------
+        elif str(route).lower() == "document":
+            st.markdown("### 2) Executing DOCUMENT flow (Mongo agent)")
+
+            # doc_query: prefer doc_q from router, else original
+            doc_query_to_run = doc_q or router_query
+
+            # ensure email exists (document flows need email)
+            if not router_email.strip():
+                st.warning("Document route requires a User Email — enter it to proceed.")
+                st.stop()
+
+            # call uv subprocess identical to Tab2
+            uv_cmd_doc = [
+                "uv", "run",
+                "src/app.py",
+                "--email", router_email,
+                "--query", doc_query_to_run
+            ]
+
+            st.code(" ".join(shlex.quote(p) for p in uv_cmd_doc))
+
+            logs_doc = []
+            try:
+                proc_doc = subprocess.Popen(
+                    uv_cmd_doc,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    cwd=ROOT_DIR,
+                    bufsize=1
+                )
+            except Exception as e:
+                st.error("Failed to run uv for document flow.")
+                st.code(str(e))
+                st.stop()
+
+            for line in proc_doc.stdout:
+                logs_doc.append(line.rstrip("\n"))
+            proc_doc.wait()
+
+            # show logs once
+            st.subheader("Document Execution Log")
+            st.code("\n".join(logs_doc))
+
+            # robust final extraction (same approach as Tab2)
+            # find last structured marker, then take everything after it
+            import re as _re
+            combined_patterns = [
+                r'^Aggregation Pipeline:',
+                r'^\{', r'^\[', r'HumanMessage\(', r'AIMessage\(', r'^Fetched role', r'^Allowed$', r'^Denied$'
+            ]
+            combined_re = _re.compile("|".join(combined_patterns))
+
+            last_structured_idx = -1
+            for idx, line in enumerate(logs_doc):
+                if combined_re.search(line):
+                    last_structured_idx = idx
+
+            if last_structured_idx + 1 < len(logs_doc):
+                final_lines_doc = logs_doc[last_structured_idx + 1 :]
+            else:
+                final_lines_doc = []
+
+            # fallback to last readable line
+            if not final_lines_doc:
+                for line in reversed(logs_doc):
+                    if not line:
+                        continue
+                    if combined_re.search(line):
+                        continue
+                    if line.strip() in ("Allowed", "Denied"):
+                        continue
+                    final_lines_doc = [line]
+                    break
+
+            raw_doc = "\n".join(final_lines_doc).strip()
+            if not raw_doc and logs_doc:
+                raw_doc = logs_doc[-1].strip()
+
+            # normalize bullets if inline
+            raw_doc = _re.sub(r'\s*-\s*(\*\*[^*]+:\*\*)', r'\n- \1', raw_doc)
+            raw_doc = _re.sub(r'(:)\s*\n- ', r'\1\n\n- ', raw_doc)
+            raw_doc = _re.sub(r'\n{3,}', '\n\n', raw_doc).strip()
+
+            st.subheader("Document Answer")
+            st.markdown(raw_doc)
+
+        else:
+            st.error(f"Router returned unknown route: {route}")
+            st.stop()
