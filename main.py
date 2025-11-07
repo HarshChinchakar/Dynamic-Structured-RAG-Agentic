@@ -441,7 +441,16 @@ st.title("AI HR Assistant — Policy RAG + Mongo Document Agent")
 # ------------------------------------------------
 # TABS
 # ------------------------------------------------
-tab1, tab2 = st.tabs(["📘 Policy RAG (Existing Debug Mode)", "🗄️ Document Query — Mongo Agent"])
+# tab1, tab2 = st.tabs(["📘 Policy RAG (Existing Debug Mode)", "🗄️ Document Query — Mongo Agent"])
+# ------------------------------------------------
+# TABS (now 3 tabs)
+# ------------------------------------------------
+tab1, tab2, tab3 = st.tabs([
+    "📘 Policy RAG (Existing Debug Mode)",
+    "🗄️ Document Query — Mongo Agent",
+    "🔀 Router — Auto route"
+])
+
 
 
 # ------------------------------------------------
