@@ -475,13 +475,17 @@ with tab1:
         st.session_state.rag_cache = None
         st.info("Cache cleared, embeddings will rebuild on next Run.")
 
-    POLICIES_PATH = os.path.join(ROOT_DIR, "Dataset", "Policies")
+    # POLICIES_PATH = os.path.join(ROOT_DIR, "Dataset", "Policies")
+    # CHange to above one for all file access - Or Update the below filename for specific file access
+    POLICIES_FILE = os.path.join(ROOT_DIR, "Dataset", "Policies", "Policies.pdf")
+
 
     # FUNCTION
     def build_index_debug():
         try:
             idx = RAGIndexer(
-                local_paths=[POLICIES_PATH],
+                # local_paths=[POLICIES_PATH],
+                local_paths=[POLICIES_FILE],
                 s3_urls=None,
                 workdir="rag_work",
                 embed_model="text-embedding-3-large",
@@ -837,7 +841,8 @@ with tab3:
             if st.session_state.get("rag_cache") is None:
                 try:
                     idx = RAGIndexer(
-                        local_paths=[POLICIES_PATH],
+                        # local_paths=[POLICIES_PATH],
+                        local_paths=[POLICIES_FILE],
                         s3_urls=None,
                         workdir="rag_work",
                         embed_model="text-embedding-3-large",
