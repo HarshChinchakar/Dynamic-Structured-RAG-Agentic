@@ -387,15 +387,6 @@ def load_src_module(module_name: str):
     except Exception:
         raise
 
-# ------------------------------------------------
-# IMPORT ChatAgent for TAB 4
-# ------------------------------------------------
-try:
-    ChatAgent_mod = load_src_module("chat_agent")   # expects src/chat_agent.py
-    ChatAgent = getattr(ChatAgent_mod, "ChatAgent")
-except Exception as e:
-    st.error(f"Failed loading chat_agent.py: {e}")
-    st.stop()
 
 # ------------------------------------------------
 # IMPORTS FOR TAB 1 (Policy RAG)
@@ -438,6 +429,17 @@ try:
         run_document_query = getattr(App_mod, "run_document_query")
 except Exception:
     pass
+    
+# ------------------------------------------------
+# IMPORT ChatAgent for TAB 4
+# ------------------------------------------------
+try:
+    ChatAgent_mod = load_src_module("chat_agent")   # expects src/chat_agent.py
+    if hasattr(ChatAgent_mod, "ChatAgent"):
+        ChatAgent = getattr(ChatAgent_mod, "ChatAgent")
+except Exception as e:
+    st.error(f"Failed loading chat_agent.py: {e}")
+    st.stop()
 
 
 # ------------------------------------------------
