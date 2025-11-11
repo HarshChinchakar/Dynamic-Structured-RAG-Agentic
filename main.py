@@ -387,6 +387,15 @@ def load_src_module(module_name: str):
     except Exception:
         raise
 
+    # Load ChatAgent for Tab 4
+    try:
+        ChatAgent_mod = load_src_module("chat_agent")
+        ChatAgent = getattr(ChatAgent_mod, "ChatAgent")
+    except Exception:
+        st.error("Failed loading chat_agent.py")
+        st.stop()
+
+
 
 # ------------------------------------------------
 # IMPORTS FOR TAB 1 (Policy RAG)
@@ -445,10 +454,16 @@ st.title("AI HR Assistant — Policy RAG + Mongo Document Agent")
 # ------------------------------------------------
 # TABS (now 3 tabs)
 # ------------------------------------------------
-tab1, tab2, tab3 = st.tabs([
+# tab1, tab2, tab3 = st.tabs([
+#     "📘 Policy RAG (Existing Debug Mode)",
+#     "🗄️ Document Query — Mongo Agent",
+#     "🔀 Router — Auto route"
+# ])
+tab1, tab2, tab3, tab4 = st.tabs([
     "📘 Policy RAG (Existing Debug Mode)",
     "🗄️ Document Query — Mongo Agent",
-    "🔀 Router — Auto route"
+    "🔀 Router — Auto route",
+    "💬 Policy Chat (With Memory)"
 ])
 
 
@@ -998,3 +1013,56 @@ with tab3:
         else:
             st.error(f"Unknown route: {route_value}")
             st.stop()
+
+# ------------------------------------------------
+# ✅ TAB 4 — Policy Chat (Memory + RAG)
+# ------------------------------------------------
+with tab4:
+    st.header("💬 Policy Chat — With Memory")
+
+    # ---- Initialize agent only once ----
+    if "chat_agent" not in st.session_state:
+        if st.session_state.get("rag_cache") is None:
+            st.error("Embeddings not built yet. Please run Tab 1 first.")
+            st.stop()
+
+        st.session_state.chat_agent = ChatAgent(st.session_state.rag_cache)
+
+    # ---- Initialize UI chat history ----
+    if "tab4_history" not in st.session_state:
+        st.session_state.tab4_history = []
+
+    # ---- Display existing conversation ----
+    for msg in st.session_state.tab4_history:
+        if msg["role"] == "user":
+            st.markdown(f"**You:** {msg['content']}")
+        else:
+            st.markdown(f"**Assistant:** {msg['content']}")
+
+    st.markdown("---")
+
+    # ---- Input box ----
+    user_msg = st.text_input("Your message:", key="tab4_input")
+
+    # ---- Submit ----
+    if st.button("Send", key="tab4_send"):
+        if not user_msg.strip():
+            st.warning("Enter a message before sending.")
+            st.stop()
+
+        # Call our agent
+        reply, updated_history, debug = st.session_state.chat_agent.chat_turn(user_msg)
+
+        # Update UI history
+        st.session_state.tab4_history = updated_history
+
+        # Force rerun to update chat visually
+        st.rerun()
+
+    # ---- Reset Conversation ----
+    if st.button("Reset Chat", key="tab4_reset"):
+        st.session_state.chat_agent.clear()
+        st.session_state.tab4_history = []
+        st.success("Chat reset.")
+        st.rerun()
+
