@@ -1022,49 +1022,64 @@ with tab3:
 with tab4:
     st.header("💬 Policy Chat — With Memory")
 
-    # ---- Initialize agent only once ----
+    # ---- Ensure embeddings exist before chat can work ----
+    if st.session_state.get("rag_cache") is None:
+        st.error("⚠️ Embeddings not built. Please go to Tab 1 and run the embedding first.")
+        st.stop()
+
+    # ---- Initialize ChatAgent ONCE ----
     if "chat_agent" not in st.session_state:
-        if st.session_state.get("rag_cache") is None:
-            st.error("Embeddings not built yet. Please run Tab 1 first.")
+        try:
+            st.session_state.chat_agent = ChatAgent(st.session_state.rag_cache)
+        except Exception as e:
+            st.error("❌ Failed to initialize ChatAgent:")
+            st.code(traceback.format_exc())
             st.stop()
 
-        st.session_state.chat_agent = ChatAgent(st.session_state.rag_cache)
-
-    # ---- Initialize UI chat history ----
+    # ---- Initialize chat display history ----
     if "tab4_history" not in st.session_state:
         st.session_state.tab4_history = []
 
     # ---- Display existing conversation ----
     for msg in st.session_state.tab4_history:
-        if msg["role"] == "user":
+        role = msg["role"]
+        if role == "user":
             st.markdown(f"**You:** {msg['content']}")
         else:
             st.markdown(f"**Assistant:** {msg['content']}")
 
     st.markdown("---")
 
-    # ---- Input box ----
+    # ---- Input for new user message ----
     user_msg = st.text_input("Your message:", key="tab4_input")
 
-    # ---- Submit ----
+    # ---- SEND ----
     if st.button("Send", key="tab4_send"):
         if not user_msg.strip():
-            st.warning("Enter a message before sending.")
+            st.warning("Please type a message!")
             st.stop()
 
-        # Call our agent
-        reply, updated_history, debug = st.session_state.chat_agent.chat_turn(user_msg)
+        try:
+            reply, updated_history, debug_info = st.session_state.chat_agent.chat_turn(user_msg)
+        except Exception:
+            st.error("❌ ChatAgent.chat_turn() failed:")
+            st.code(traceback.format_exc())
+            st.stop()
 
-        # Update UI history
+        # ✅ Update UI history from agent history
         st.session_state.tab4_history = updated_history
 
-        # Force rerun to update chat visually
+        # ✅ Refresh page to show updated conversation
         st.rerun()
 
-    # ---- Reset Conversation ----
+    # ---- RESET ----
     if st.button("Reset Chat", key="tab4_reset"):
-        st.session_state.chat_agent.clear()
+        try:
+            st.session_state.chat_agent.clear()
+        except Exception:
+            pass
+
         st.session_state.tab4_history = []
-        st.success("Chat reset.")
+        st.success("✅ Chat reset.")
         st.rerun()
 
