@@ -387,15 +387,15 @@ def load_src_module(module_name: str):
     except Exception:
         raise
 
-    # Load ChatAgent for Tab 4
-    try:
-        ChatAgent_mod = load_src_module("chat_agent")
-        ChatAgent = getattr(ChatAgent_mod, "ChatAgent")
-    except Exception:
-        st.error("Failed loading chat_agent.py")
-        st.stop()
-
-
+# ------------------------------------------------
+# IMPORT ChatAgent for TAB 4
+# ------------------------------------------------
+try:
+    ChatAgent_mod = load_src_module("chat_agent")   # expects src/chat_agent.py
+    ChatAgent = getattr(ChatAgent_mod, "ChatAgent")
+except Exception as e:
+    st.error(f"Failed loading chat_agent.py: {e}")
+    st.stop()
 
 # ------------------------------------------------
 # IMPORTS FOR TAB 1 (Policy RAG)
