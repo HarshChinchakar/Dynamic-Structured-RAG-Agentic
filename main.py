@@ -431,14 +431,14 @@ except Exception:
     pass
     
 # ------------------------------------------------
-# IMPORT ChatAgent for TAB 4
+# IMPORT ChatAgent for TAB 4  (EXACT same pattern as others)
 # ------------------------------------------------
 try:
-    ChatAgent_mod = load_src_module("chat_agent")   # expects src/chat_agent.py
-    if hasattr(ChatAgent_mod, "ChatAgent"):
-        ChatAgent = getattr(ChatAgent_mod, "ChatAgent")
-except Exception as e:
-    st.error(f"Failed loading chat_agent.py: {e}")
+    ChatAgent_mod = load_src_module("chat_agent")
+    ChatAgent = getattr(ChatAgent_mod, "ChatAgent")  # <-- no hasattr guard; force AttributeError if missing
+except Exception:
+    st.error("Failed loading chat_agent.py:")
+    st.code(traceback.format_exc())
     st.stop()
 
 
