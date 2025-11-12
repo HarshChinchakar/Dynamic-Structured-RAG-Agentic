@@ -25,7 +25,7 @@ from openai import OpenAI
 load_dotenv()
 
 MODEL_NAME = "gpt-4o-mini"        # Fast + strong
-TEMPERATURE = 0.2
+TEMPERATURE = 0.0
 MAX_TOKENS = 1024                 # Smaller = faster
 
 # Limit context size per chunk
