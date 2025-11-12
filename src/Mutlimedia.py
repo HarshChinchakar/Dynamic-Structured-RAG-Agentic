@@ -169,11 +169,10 @@ def multimedia_response(query: str, context_chunks: list[str]) -> str:
             3) If neither an explicit answer nor a conservative inference is possible, reply EXACTLY:
             "I don't have enough information in the provided documents."
             
-            Do NOT output quotes, chunk ids, filenames, or any provenance. Do NOT reveal internal reasoning. Keep the answer concise and user-focused.
+            Do NOT output quotes, chunk ids, filenames, or any provenance. Do NOT reveal internal reasoning. Keep the answer concise entaling more relevant information around the same topic (if any) and user-focused.
             
             [IMPORTANT] You are NOT allowed to hallucinate missing details.
             [IMPORTANT] Never invent numbers, dates, names, amounts, or policy clauses that are not present or inferable.
-            [IMPORTANT] If the answer cannot be found or inferred from the context, reply EXACTLY:
             
             -----------------------------------
             CONTEXT:
