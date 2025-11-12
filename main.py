@@ -501,8 +501,8 @@ with tab1:
     def build_index_debug():
         try:
             idx = RAGIndexer(
-                # local_paths=[POLICIES_PATH],
-                local_paths=[POLICIES_FILE],
+                local_paths=[POLICIES_PATH],
+                # local_paths=[POLICIES_FILE],
                 s3_urls=None,
                 workdir="rag_work",
                 embed_model="text-embedding-3-large",
