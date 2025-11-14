@@ -820,11 +820,11 @@ class RAGIndexer:
         _print(f"[EMBED] Embedded {vecs.shape[0]} chunks, dim={vecs.shape[1]} (model={self.cfg.embed_model})")
 
         # 5) Optional Mongo persistence
-        if self.cfg.mongo_uri:
-            try:
-                persist_to_mongo(chunked_docs, vecs, self.cfg.mongo_uri, self.cfg.mongo_db, self.cfg.mongo_coll)
-            except Exception as e:
-                _print(f"[Mongo] Skipped persistence due to error: {e}")
+        # if self.cfg.mongo_uri:
+        #     try:
+        #         persist_to_mongo(chunked_docs, vecs, self.cfg.mongo_uri, self.cfg.mongo_db, self.cfg.mongo_coll)
+        #     except Exception as e:
+        #         _print(f"[Mongo] Skipped persistence due to error: {e}")
 
     def query(self, q: str, top_k: int = 5) -> List[Dict[str, Any]]:
         if self.vectors is None or not self.texts:
