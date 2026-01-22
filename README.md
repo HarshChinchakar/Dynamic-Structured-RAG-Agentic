@@ -1,4 +1,4 @@
-# Mongo-RAG (Natural Language to Mongo Query System with PII Masking)
+# Dynamic Structured RAG - Agentic (Natural Language to Mongo Query System with PII Masking)
 
 ## Overview
 
